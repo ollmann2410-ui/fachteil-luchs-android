@@ -1,0 +1,16 @@
+FACHTEIL-LUCHS ANDROID – UPLOAD AUF GITHUB
+
+1. Die ZIP-Datei auf dem PC entpacken.
+2. Auf GitHub das Repository öffnen:
+   ollmann2410-ui/fachteil-luchs-android
+3. Auf "uploading an existing file" klicken.
+4. NICHT die ZIP-Datei hochladen.
+   Stattdessen ALLE Dateien und Ordner aus dem entpackten Projektordner hineinziehen.
+   Wichtig: Der Ordner .github muss mit hochgeladen werden.
+5. Unten bei Commit message z. B. "Android Projekt hochgeladen" eintragen.
+6. Auf "Commit changes" klicken.
+7. Danach oben im Repository den Reiter "Actions" öffnen.
+8. Der Workflow "Build Fachteil-Luchs APK" startet automatisch.
+9. Nach erfolgreichem Build erscheint im Workflow unten das Artifact "Fachteil-Luchs-APK".
+
+Das bestehende Repository fachteilaudio wird hierfür nicht verwendet oder verändert.
