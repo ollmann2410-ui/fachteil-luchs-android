@@ -1,0 +1,41 @@
+name: Build Fachteil-Luchs APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Java 17 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle 8.9 einrichten
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Android APK bauen
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: APK sinnvoll benennen
+        run: cp app/build/outputs/apk/debug/app-debug.apk Fachteil-Luchs.apk
+
+      - name: APK als Download bereitstellen
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fachteil-Luchs-APK
+          path: Fachteil-Luchs.apk
+          if-no-files-found: error
