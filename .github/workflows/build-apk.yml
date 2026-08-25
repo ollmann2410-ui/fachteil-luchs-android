@@ -27,15 +27,48 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Android APK bauen
-        run: gradle :app:assembleDebug --stacktrace
+      - name: Signatur-Secrets prüfen
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "ANDROID_KEYSTORE_BASE64 fehlt"; exit 1; }
+          test -n "$ANDROID_KEYSTORE_PASSWORD" || { echo "ANDROID_KEYSTORE_PASSWORD fehlt"; exit 1; }
+          test -n "$ANDROID_KEY_ALIAS" || { echo "ANDROID_KEY_ALIAS fehlt"; exit 1; }
+          test -n "$ANDROID_KEY_PASSWORD" || { echo "ANDROID_KEY_PASSWORD fehlt"; exit 1; }
+
+      - name: Festen Signierschlüssel bereitstellen
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/fachteil-signing"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/fachteil-signing/fachteil-luchs-release.jks"
+
+      - name: Signierte Release-APK bauen
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/fachteil-signing/fachteil-luchs-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: gradle :app:assembleRelease --stacktrace
 
       - name: APK sinnvoll benennen
-        run: cp app/build/outputs/apk/debug/app-debug.apk Fachteil-Luchs.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V1.1-SIGNED.apk
+
+      - name: APK-Signatur prüfen
+        shell: bash
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
+          test -n "$APKSIGNER" || { echo "apksigner nicht gefunden"; exit 1; }
+          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V1.1-SIGNED.apk
 
       - name: APK als Download bereitstellen
         uses: actions/upload-artifact@v4
         with:
-          name: Fachteil-Luchs-APK
-          path: Fachteil-Luchs.apk
+          name: Fachteil-Luchs-V1.1-SIGNED-APK
+          path: Fachteil-Luchs-V1.1-SIGNED.apk
           if-no-files-found: error
