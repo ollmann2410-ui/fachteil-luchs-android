@@ -158,7 +158,7 @@ button{color:inherit}
 .backupPanel{padding:18px;margin-top:16px}
 .backupHead{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
 .backupTitle{font-size:17px;font-weight:950;letter-spacing:-.02em}.backupText{font-size:12px;color:var(--muted);line-height:1.5;margin-top:4px;max-width:72ch}
-.backupActions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}.backupActions .btn{min-width:170px}
+.backupActions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}.backupActions .btn{min-width:170px}.backupActions .btn.danger{border-color:rgba(255,107,99,.45);color:#ff918a;background:rgba(255,107,99,.07)}.backupActions .btn.danger:hover{border-color:rgba(255,107,99,.72);background:rgba(255,107,99,.12)}
 .backupStatus{margin-top:11px;min-height:18px;font-size:12px;color:var(--muted);line-height:1.45}.backupStatus.good{color:#54d68b}.backupStatus.bad{color:#ff918a}
 .backupMeta{display:flex;gap:8px;flex-wrap:wrap;margin-top:11px}.backupMeta .badge{font-size:11px}
 @media(max-width:640px){.backupHead{flex-direction:column}.backupActions .btn{width:100%}}
@@ -258,16 +258,17 @@ button{color:inherit}
 
     <div class="card backupPanel">
       <div class="backupHead">
-        <div><div class="backupTitle">Lernstand sichern</div><div class="backupText">Exportiert deinen Lernfortschritt, Fehlerpool sowie Quiz- und Prüfungsdaten als kleine JSON-Datei. Auf einem anderen Gerät kannst du diese Datei wieder importieren.</div></div>
+        <div><div class="backupTitle">Lernstand sichern & verwalten</div><div class="backupText">Exportiert deinen Lernfortschritt, Fehlerpool sowie Quiz- und Prüfungsdaten als kleine JSON-Datei. Du kannst einen Lernstand wieder importieren oder alle Lern- und Prüfungsdaten auf diesem Gerät vollständig auf 0 setzen.</div></div>
         <div class="badge">Backup</div>
       </div>
       <div class="backupActions">
         <button class="btn primary" id="exportProgress">Lernstand exportieren</button>
         <button class="btn" id="importProgress">Lernstand importieren</button>
+        <button class="btn danger" id="resetProgress">Lernstand löschen</button>
         <input class="hidden" id="importProgressFile" type="file" accept=".json,application/json">
       </div>
-      <div class="backupMeta"><div class="badge">Fehlerpool</div><div class="badge">Lernstatistik</div><div class="badge">Quiz-Ergebnisse</div></div>
-      <div class="backupStatus" id="backupStatus">Beim Import wird der aktuell auf diesem Gerät gespeicherte Lernstand ersetzt.</div>
+      <div class="backupMeta"><div class="badge">Fehlerpool</div><div class="badge">Lernstatistik</div><div class="badge">Quiz-Ergebnisse</div><div class="badge">Prüfungsverlauf</div></div>
+      <div class="backupStatus" id="backupStatus">Beim Import wird der aktuelle Lernstand ersetzt. Löschen setzt alle Lern- und Prüfungsdaten nach zwei Sicherheitsabfragen vollständig auf 0.</div>
     </div>
   </main>
 
@@ -534,6 +535,19 @@ function sanitizeImportedStudyState(raw){
 }
 function importLearningProgressFile(file){
   if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const data=JSON.parse(String(reader.result||''));if(!data||typeof data!=='object'||data.format!==BACKUP_FORMAT||!data.errorState||!data.studyState)throw new Error('invalid');const nextErrors=sanitizeImportedErrorState(data.errorState),nextStudy=sanitizeImportedStudyState(data.studyState);let nextAnalysis=null;if(Number(data.version)>=2&&data.analysisState)nextAnalysis=sanitizeAnalysisState(data.analysisState);if(!nextAnalysis)nextAnalysis=buildAnalysisFromLegacy(nextStudy,nextErrors,`backup-v${Number(data.version)||1}`);if(!validateAnalysisState(nextAnalysis))throw new Error('analysis-invalid');const ok=window.confirm(`Lernstand importieren?\n\nDer aktuelle Lernstand auf diesem Gerät wird ersetzt.\nBackup: ${Object.keys(nextStudy.cards).length} bearbeitete Karten, ${Object.keys(nextErrors).length} Fehlerkarten.`);if(!ok){setBackupStatus('Import abgebrochen. Dein aktueller Lernstand wurde nicht verändert.');$('importProgressFile').value='';return;}errorState=nextErrors;studyState=nextStudy;analysisState=nextAnalysis;try{localStorage.setItem(ERROR_STATE_KEY,JSON.stringify(errorState));localStorage.setItem(STUDY_STATE_KEY,JSON.stringify(studyState));localStorage.setItem(ANALYSIS_STATE_KEY,JSON.stringify(analysisState));}catch(e){}if(data.examState&&window.FachteilExamV13&&typeof window.FachteilExamV13.importState==='function')window.FachteilExamV13.importState(data.examState);updateErrorCount();updateHomeStats();setBackupStatus(`Import erfolgreich · ${learnedCount()} Karten bearbeitet · ${getErrorCards().length} im Fehlerpool.`,'good');$('importProgressFile').value='';}catch(e){setBackupStatus('Diese Datei ist kein gültiger Fachteil-Luchs-Lernstand.','bad');$('importProgressFile').value='';}};reader.onerror=()=>{setBackupStatus('Die Backup-Datei konnte nicht gelesen werden.','bad');$('importProgressFile').value='';};reader.readAsText(file,'utf-8');
+}
+function resetLearningProgress(){
+  let examCount=0;
+  try{const ex=window.FachteilExamV13&&typeof window.FachteilExamV13.exportState==='function'?window.FachteilExamV13.exportState():null;examCount=ex&&Array.isArray(ex.attempts)?ex.attempts.length:0;}catch(e){}
+  const first=window.confirm(`Lernstand vollständig löschen?\n\nGelöscht werden auf diesem Gerät:\n• alle Lernkartenbewertungen\n• der komplette Fehlerpool\n• Quiz-Ergebnisse\n• Prüfungsverlauf und laufende Prüfung\n• Lernanalyse und Prüfungsreife\n\nAktuell: ${learnedCount()} bearbeitete Karten · ${getErrorCards().length} Fehlerkarten · ${examCount} Prüfungen.\n\nDiese Aktion kann nicht rückgängig gemacht werden. Falls du den Stand behalten möchtest, exportiere ihn vorher.`);
+  if(!first){setBackupStatus('Löschen abgebrochen. Dein Lernstand wurde nicht verändert.');return;}
+  const second=window.confirm('Letzte Bestätigung\n\nWirklich ALLE Lern- und Prüfungsdaten auf diesem Gerät auf 0 setzen?\n\nDarkmode/Theme bleibt erhalten.');
+  if(!second){setBackupStatus('Löschen abgebrochen. Dein Lernstand wurde nicht verändert.');return;}
+  try{
+    [ERROR_KEY,ERROR_STATE_KEY,STUDY_STATE_KEY,ANALYSIS_STATE_KEY,'fachteil_exam_state_v1'].forEach(k=>localStorage.removeItem(k));
+    try{sessionStorage.setItem('fachteil_reset_done','1');}catch(e){}
+    window.location.reload();
+  }catch(e){setBackupStatus('Lernstand konnte nicht vollständig gelöscht werden. Bitte erneut versuchen.','bad');}
 }
 function normalize(s){return (s||'').toLocaleLowerCase('de-DE').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ß/g,'ss');}
 function cardKey(c){return c&&c.id?c.id:`${c._area}:${c.n}`;}
@@ -826,12 +840,12 @@ function renderGlobalSearch(){
   if(found.length>30){const more=document.createElement('div');more.className='mini';more.style.padding='7px 4px';more.textContent=`Weitere ${found.length-30} Treffer – Suchbegriff genauer eingrenzen.`;box.appendChild(more);}
 }
 
-$('themeBtn').onclick=toggleTheme;$('homeBtn').onclick=goHome;$('exportProgress').onclick=exportLearningProgress;$('importProgress').onclick=()=>$('importProgressFile').click();$('importProgressFile').addEventListener('change',e=>importLearningProgressFile(e.target.files&&e.target.files[0]));$('openStats').onclick=openStats;$('openStats').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openStats()}};$('openErrorPool').onclick=openErrorPool;$('startRandomLearning').onclick=startRandomLearning;['randomHf1','randomHf2','randomHf3','randomAufmass'].forEach(id=>$(id).addEventListener('change',updateRandomLearnHint));$('startQuiz').onclick=()=>startQuiz('normal');$('startWeakQuiz').onclick=()=>startQuiz('weak');$('quizNext').onclick=nextQuiz;$('quizAgain').onclick=()=>startQuiz(quizMode);$('quizInspectErrors').onclick=openQuizInspect;$('quizReviewErrors').onclick=openQuizReview;$('quizToErrors').onclick=openErrorPool;$('quizToHome').onclick=goHome;$('reviewPrev').onclick=()=>stepQuizInspect(-1);$('reviewNext').onclick=()=>stepQuizInspect(1);$('reviewLearn').onclick=openQuizReview;$('reviewBackResult').onclick=backToQuizResult;$('reviewToErrors').onclick=openErrorPool;
+$('themeBtn').onclick=toggleTheme;$('homeBtn').onclick=goHome;$('exportProgress').onclick=exportLearningProgress;$('importProgress').onclick=()=>$('importProgressFile').click();$('resetProgress').onclick=resetLearningProgress;$('importProgressFile').addEventListener('change',e=>importLearningProgressFile(e.target.files&&e.target.files[0]));$('openStats').onclick=openStats;$('openStats').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openStats()}};$('openErrorPool').onclick=openErrorPool;$('startRandomLearning').onclick=startRandomLearning;['randomHf1','randomHf2','randomHf3','randomAufmass'].forEach(id=>$(id).addEventListener('change',updateRandomLearnHint));$('startQuiz').onclick=()=>startQuiz('normal');$('startWeakQuiz').onclick=()=>startQuiz('weak');$('quizNext').onclick=nextQuiz;$('quizAgain').onclick=()=>startQuiz(quizMode);$('quizInspectErrors').onclick=openQuizInspect;$('quizReviewErrors').onclick=openQuizReview;$('quizToErrors').onclick=openErrorPool;$('quizToHome').onclick=goHome;$('reviewPrev').onclick=()=>stepQuizInspect(-1);$('reviewNext').onclick=()=>stepQuizInspect(1);$('reviewLearn').onclick=openQuizReview;$('reviewBackResult').onclick=backToQuizResult;$('reviewToErrors').onclick=openErrorPool;
 $('globalSearch').addEventListener('input',renderGlobalSearch);$('clearGlobalSearch').onclick=()=>{$('globalSearch').value='';renderGlobalSearch();$('globalSearch').focus()};
 $('chipToggleBtn').onclick=()=>{chipsVisible=!chipsVisible;setChipToggle()};$('search').addEventListener('input',()=>{if($('search').value.trim()&&chipsVisible){chipsVisible=false;setChipToggle()}applySearch(true)});$('clearSearch').onclick=()=>{$('search').value='';applySearch(true);$('search').focus()};
 $('flashcard').onclick=toggleReveal;$('flashcard').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggleReveal()}};$('revealBtn').onclick=toggleReveal;$('prevBtn').onclick=()=>step(-1);$('nextBtn').onclick=()=>step(1);$('randomBtn').onclick=randomCard;$('unknownBtn').onclick=markUnknown;$('unsureBtn').onclick=markUnsure;$('knownBtn').onclick=markKnown;
 document.addEventListener('keydown',e=>{if($('library').classList.contains('hidden')||document.activeElement===$('search'))return;if(e.key==='ArrowLeft')step(-1);if(e.key==='ArrowRight')step(1);if(e.key==='Enter'||e.key===' ')toggleReveal();});
-setThemeIcon();buildTiles();migrateStudyFromErrors();initializeAnalysisState();updateErrorCount();updateHomeStats();updateRandomLearnHint();
+setThemeIcon();buildTiles();migrateStudyFromErrors();initializeAnalysisState();updateErrorCount();updateHomeStats();updateRandomLearnHint();try{if(sessionStorage.getItem('fachteil_reset_done')==='1'){sessionStorage.removeItem('fachteil_reset_done');setBackupStatus('Lernstand gelöscht · alle Lern- und Prüfungsdaten stehen auf 0.','good');}}catch(e){}
 
 </script>
 <script src="analysis-v12.js"></script>
