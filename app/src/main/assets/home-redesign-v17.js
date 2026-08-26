@@ -34,6 +34,7 @@
       .v17Area{appearance:none;text-align:left;color:var(--text);padding:12px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01)),var(--card);box-shadow:0 7px 18px rgba(0,0,0,.08);cursor:pointer;min-width:0}
       .v17Area:hover{border-color:rgba(121,197,255,.52);transform:translateY(-1px)}
       .v17AreaCode{width:35px;height:35px;display:grid;place-items:center;border-radius:11px;background:var(--soft);border:1px solid rgba(121,197,255,.28);font-size:10px;font-weight:950;color:var(--primary)}
+      .v17AreaCode svg{width:22px;height:22px;stroke-width:1.9}
       .v17Area strong{display:block;font-size:13px;margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       .v17Area span{display:block;font-size:8px;color:var(--muted);margin-top:2px;line-height:1.3}
 
@@ -140,7 +141,7 @@
     var areaGrid=document.createElement('div');areaGrid.className='v17AreaGrid';
     [
       ['hf1','HF 1','264 Karten','Technik & Gestaltung'],['hf2','HF 2','96 Karten','Auftragsabwicklung'],['hf3','HF 3','64 Karten','Betriebsführung'],['aufmass','Aufmaß','96 Karten','Aufmaß & Abrechnung']
-    ].forEach(function(x){var b=document.createElement('button');b.type='button';b.className='v17Area';b.innerHTML='<span class="v17AreaCode">'+(x[0]==='aufmass'?'AM':x[1].replace(' ',''))+'</span><strong>'+x[1]+'</strong><span>'+x[2]+' · '+x[3]+'</span>';b.onclick=function(){if(typeof openArea==='function')openArea(x[0]);};areaGrid.appendChild(b);});
+    ].forEach(function(x){var b=document.createElement('button');b.type='button';b.className='v17Area';var fallback=(x[0]==='aufmass'?'AM':x[1].replace(' ',''));var areaIcon=(typeof iconSvg==='function'?iconSvg(x[0]):fallback);b.innerHTML='<span class="v17AreaCode" aria-hidden="true">'+areaIcon+'</span><strong>'+x[1]+'</strong><span>'+x[2]+' · '+x[3]+'</span>';b.onclick=function(){if(typeof openArea==='function')openArea(x[0]);};areaGrid.appendChild(b);});
     areas.appendChild(areaGrid);dashboard.appendChild(areas);
 
     var train=document.createElement('section');train.className='v17Group';train.innerHTML='<div class="v17GroupHead"><div class="v17GroupTitle">Trainieren</div><div class="v17GroupHint">Modus wählen</div></div>';
