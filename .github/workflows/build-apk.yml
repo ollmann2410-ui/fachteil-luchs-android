@@ -57,18 +57,18 @@ jobs:
         run: gradle :app:assembleRelease --stacktrace
 
       - name: APK sinnvoll benennen
-        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V1.4-SIGNED.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V1.5-SIGNED.apk
 
       - name: APK-Signatur prüfen
         shell: bash
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           test -n "$APKSIGNER" || { echo "apksigner nicht gefunden"; exit 1; }
-          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V1.4-SIGNED.apk
+          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V1.5-SIGNED.apk
 
       - name: APK als Download bereitstellen
         uses: actions/upload-artifact@v4
         with:
-          name: Fachteil-Luchs-V1.4-SIGNED-APK
-          path: Fachteil-Luchs-V1.4-SIGNED.apk
+          name: Fachteil-Luchs-V1.5-SIGNED-APK
+          path: Fachteil-Luchs-V1.5-SIGNED.apk
           if-no-files-found: error
