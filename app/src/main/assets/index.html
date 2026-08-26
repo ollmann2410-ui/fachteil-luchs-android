@@ -258,7 +258,7 @@ button{color:inherit}
 
     <div class="card backupPanel">
       <div class="backupHead">
-        <div><div class="backupTitle">Lernstand sichern</div><div class="backupText">Exportiert deinen Lernfortschritt, Fehlerpool und die Quiz-Statistik als kleine JSON-Datei. Auf einem anderen Gerät kannst du diese Datei wieder importieren.</div></div>
+        <div><div class="backupTitle">Lernstand sichern</div><div class="backupText">Exportiert deinen Lernfortschritt, Fehlerpool sowie Quiz- und Prüfungsdaten als kleine JSON-Datei. Auf einem anderen Gerät kannst du diese Datei wieder importieren.</div></div>
         <div class="badge">Backup</div>
       </div>
       <div class="backupActions">
@@ -389,7 +389,7 @@ const ANALYSIS_STATE_KEY='fachteil_cards_analysis_v2';
 const ANALYSIS_SCHEMA_VERSION=2;
 const CARD_MAP_VERSION='rahmenlehrplan-v1-2026-08-25';
 const BACKUP_FORMAT='fachteil-luchs-lernstand';
-const BACKUP_VERSION=2;
+const BACKUP_VERSION=3;
 const $=id=>document.getElementById(id);
 
 Object.entries(AREAS).forEach(([key,a])=>a.cards.forEach(c=>{c._area=key;}));
@@ -521,7 +521,7 @@ function updateHomeStats(){
 function setBackupStatus(text,type=''){const el=$('backupStatus');if(!el)return;el.textContent=text;el.className='backupStatus'+(type?` ${type}`:'');}
 function exportLearningProgress(){
   try{
-    const payload={format:BACKUP_FORMAT,version:BACKUP_VERSION,schemaVersion:ANALYSIS_SCHEMA_VERSION,cardMapVersion:CARD_MAP_VERSION,app:'Fachteil-Luchs',exportedAt:new Date().toISOString(),cardCount:ALL_CARDS.length,errorState,studyState,analysisState};const json=JSON.stringify(payload,null,2);const d=new Date(),pad=n=>String(n).padStart(2,'0');const fileName=`Fachteil_Luchs_Lernstand_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.json`;
+    const payload={format:BACKUP_FORMAT,version:BACKUP_VERSION,schemaVersion:ANALYSIS_SCHEMA_VERSION,cardMapVersion:CARD_MAP_VERSION,app:'Fachteil-Luchs',exportedAt:new Date().toISOString(),cardCount:ALL_CARDS.length,errorState,studyState,analysisState,examState:(window.FachteilExamV13&&typeof window.FachteilExamV13.exportState==='function')?window.FachteilExamV13.exportState():null};const json=JSON.stringify(payload,null,2);const d=new Date(),pad=n=>String(n).padStart(2,'0');const fileName=`Fachteil_Luchs_Lernstand_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}.json`;
     if(window.AndroidBridge&&typeof window.AndroidBridge.saveTextFile==='function'){window.AndroidBridge.saveTextFile(fileName,json);}else{const blob=new Blob([json],{type:'application/json;charset=utf-8'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=fileName;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1200);}setBackupStatus(`Lernstand exportiert · ${learnedCount()} Karten bearbeitet · ${getErrorCards().length} im Fehlerpool.`,'good');
   }catch(e){setBackupStatus('Export nicht möglich. Bitte versuche es erneut.','bad');}
 }
@@ -533,7 +533,7 @@ function sanitizeImportedStudyState(raw){
   const out={cards:{},quizzes:0,lastQuiz:null};if(!raw||typeof raw!=='object'||Array.isArray(raw))return out;const cards=raw.cards&&typeof raw.cards==='object'&&!Array.isArray(raw.cards)?raw.cards:{};Object.entries(cards).forEach(([k,e])=>{if(!validCardKey(k)||!e||typeof e!=='object'||Array.isArray(e))return;out.cards[k]={known:Math.max(0,Number(e.known)||0),unsure:Math.max(0,Number(e.unsure)||0),wrong:Math.max(0,Number(e.wrong)||0),first:Number(e.first)||Date.now(),last:Number(e.last)||Date.now(),source:String(e.source||'import')};});out.quizzes=Math.max(0,Number(raw.quizzes)||0);out.lastQuiz=raw.lastQuiz&&typeof raw.lastQuiz==='object'&&!Array.isArray(raw.lastQuiz)?raw.lastQuiz:null;return out;
 }
 function importLearningProgressFile(file){
-  if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const data=JSON.parse(String(reader.result||''));if(!data||typeof data!=='object'||data.format!==BACKUP_FORMAT||!data.errorState||!data.studyState)throw new Error('invalid');const nextErrors=sanitizeImportedErrorState(data.errorState),nextStudy=sanitizeImportedStudyState(data.studyState);let nextAnalysis=null;if(Number(data.version)>=2&&data.analysisState)nextAnalysis=sanitizeAnalysisState(data.analysisState);if(!nextAnalysis)nextAnalysis=buildAnalysisFromLegacy(nextStudy,nextErrors,`backup-v${Number(data.version)||1}`);if(!validateAnalysisState(nextAnalysis))throw new Error('analysis-invalid');const ok=window.confirm(`Lernstand importieren?\n\nDer aktuelle Lernstand auf diesem Gerät wird ersetzt.\nBackup: ${Object.keys(nextStudy.cards).length} bearbeitete Karten, ${Object.keys(nextErrors).length} Fehlerkarten.`);if(!ok){setBackupStatus('Import abgebrochen. Dein aktueller Lernstand wurde nicht verändert.');$('importProgressFile').value='';return;}errorState=nextErrors;studyState=nextStudy;analysisState=nextAnalysis;try{localStorage.setItem(ERROR_STATE_KEY,JSON.stringify(errorState));localStorage.setItem(STUDY_STATE_KEY,JSON.stringify(studyState));localStorage.setItem(ANALYSIS_STATE_KEY,JSON.stringify(analysisState));}catch(e){}updateErrorCount();updateHomeStats();setBackupStatus(`Import erfolgreich · ${learnedCount()} Karten bearbeitet · ${getErrorCards().length} im Fehlerpool.`,'good');$('importProgressFile').value='';}catch(e){setBackupStatus('Diese Datei ist kein gültiger Fachteil-Luchs-Lernstand.','bad');$('importProgressFile').value='';}};reader.onerror=()=>{setBackupStatus('Die Backup-Datei konnte nicht gelesen werden.','bad');$('importProgressFile').value='';};reader.readAsText(file,'utf-8');
+  if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const data=JSON.parse(String(reader.result||''));if(!data||typeof data!=='object'||data.format!==BACKUP_FORMAT||!data.errorState||!data.studyState)throw new Error('invalid');const nextErrors=sanitizeImportedErrorState(data.errorState),nextStudy=sanitizeImportedStudyState(data.studyState);let nextAnalysis=null;if(Number(data.version)>=2&&data.analysisState)nextAnalysis=sanitizeAnalysisState(data.analysisState);if(!nextAnalysis)nextAnalysis=buildAnalysisFromLegacy(nextStudy,nextErrors,`backup-v${Number(data.version)||1}`);if(!validateAnalysisState(nextAnalysis))throw new Error('analysis-invalid');const ok=window.confirm(`Lernstand importieren?\n\nDer aktuelle Lernstand auf diesem Gerät wird ersetzt.\nBackup: ${Object.keys(nextStudy.cards).length} bearbeitete Karten, ${Object.keys(nextErrors).length} Fehlerkarten.`);if(!ok){setBackupStatus('Import abgebrochen. Dein aktueller Lernstand wurde nicht verändert.');$('importProgressFile').value='';return;}errorState=nextErrors;studyState=nextStudy;analysisState=nextAnalysis;try{localStorage.setItem(ERROR_STATE_KEY,JSON.stringify(errorState));localStorage.setItem(STUDY_STATE_KEY,JSON.stringify(studyState));localStorage.setItem(ANALYSIS_STATE_KEY,JSON.stringify(analysisState));}catch(e){}if(data.examState&&window.FachteilExamV13&&typeof window.FachteilExamV13.importState==='function')window.FachteilExamV13.importState(data.examState);updateErrorCount();updateHomeStats();setBackupStatus(`Import erfolgreich · ${learnedCount()} Karten bearbeitet · ${getErrorCards().length} im Fehlerpool.`,'good');$('importProgressFile').value='';}catch(e){setBackupStatus('Diese Datei ist kein gültiger Fachteil-Luchs-Lernstand.','bad');$('importProgressFile').value='';}};reader.onerror=()=>{setBackupStatus('Die Backup-Datei konnte nicht gelesen werden.','bad');$('importProgressFile').value='';};reader.readAsText(file,'utf-8');
 }
 function normalize(s){return (s||'').toLocaleLowerCase('de-DE').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ß/g,'ss');}
 function cardKey(c){return c&&c.id?c.id:`${c._area}:${c.n}`;}
@@ -836,5 +836,6 @@ setThemeIcon();buildTiles();migrateStudyFromErrors();initializeAnalysisState();u
 </script>
 <script src="analysis-v12.js"></script>
 <script src="analysis-v121-mobile.js"></script>
+<script src="exam-v13.js"></script>
 </body>
 </html>
