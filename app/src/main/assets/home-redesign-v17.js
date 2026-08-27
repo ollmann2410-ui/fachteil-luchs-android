@@ -4,6 +4,8 @@
   window.__FachteilLuchsHomeV17=true;
 
   var home=null,dashboard=null;
+  function totalCards(){return (typeof ALL_CARDS!=='undefined'&&ALL_CARDS&&ALL_CARDS.length)?ALL_CARDS.length:520;}
+  function areaCardCount(key){try{return (typeof AREAS!=='undefined'&&AREAS[key]&&AREAS[key].cards)?AREAS[key].cards.length:0;}catch(e){return 0;}}
   function byId(id){return document.getElementById(id);}
   function q(sel,root){return (root||document).querySelector(sel);}
   function safe(fn){try{return fn();}catch(e){return null;}}
@@ -116,7 +118,7 @@
   function setupExistingPanels(){
     var search=q('.homeSearchCard',home),quiz=q('.quizHome',home),random=q('.randomLearnHome',home);
     if(search){
-      addSetupLabel(search,'Wissensdatenbank','Alle 520 Karten');
+      addSetupLabel(search,'Wissensdatenbank','Alle '+totalCards()+' Karten');
       var title=q('.homeSearchTitle',search),txt=q('.homeSearchText',search),input=byId('globalSearch');
       if(title)title.textContent='Wissen gezielt nachschlagen';
       if(txt)txt.textContent='Durchsuche HF 1, HF 2, HF 3 und Aufmaß gleichzeitig. Frage und Antwort werden vollständig berücksichtigt.';
@@ -136,13 +138,13 @@
     if(byId('v17Dashboard')){dashboard=byId('v17Dashboard');return;}
     dashboard=document.createElement('div');dashboard.id='v17Dashboard';dashboard.className='v17Dashboard';
 
-    var overview=document.createElement('div');overview.className='card v17Overview';overview.innerHTML='<div class="v17OverviewTop"><div><div class="v17Eyebrow">Dein Lernstand</div><div class="v17OverviewTitle" id="v17ProgressTitle">0 von 520 Karten bearbeitet</div><div class="v17OverviewMeta">Was möchtest du jetzt machen?</div></div><div class="v17OverviewBadges"><span class="badge" id="v17ErrorBadge">Fehlerpool 0</span><span class="badge" id="v17QuizBadge">Quiz –</span></div></div><div class="v17Progress"><span id="v17ProgressBar"></span></div>';
+    var overview=document.createElement('div');overview.className='card v17Overview';overview.innerHTML='<div class="v17OverviewTop"><div><div class="v17Eyebrow">Dein Lernstand</div><div class="v17OverviewTitle" id="v17ProgressTitle">0 von '+totalCards()+' Karten bearbeitet</div><div class="v17OverviewMeta">Was möchtest du jetzt machen?</div></div><div class="v17OverviewBadges"><span class="badge" id="v17ErrorBadge">Fehlerpool 0</span><span class="badge" id="v17QuizBadge">Quiz –</span></div></div><div class="v17Progress"><span id="v17ProgressBar"></span></div>';
     dashboard.appendChild(overview);
 
     var areas=document.createElement('section');areas.className='v17Group';areas.innerHTML='<div class="v17GroupHead"><div class="v17GroupTitle">Lernbereiche</div><div class="v17GroupHint">Direkt lernen</div></div>';
     var areaGrid=document.createElement('div');areaGrid.className='v17AreaGrid';
     [
-      ['hf1','HF 1','264 Karten','Technik & Gestaltung'],['hf2','HF 2','96 Karten','Auftragsabwicklung'],['hf3','HF 3','64 Karten','Betriebsführung'],['aufmass','Aufmaß','96 Karten','Aufmaß & Abrechnung']
+      ['hf1','HF 1',areaCardCount('hf1')+' Karten','Technik & Gestaltung'],['hf2','HF 2',areaCardCount('hf2')+' Karten','Auftragsabwicklung'],['hf3','HF 3',areaCardCount('hf3')+' Karten','Betriebsführung'],['aufmass','Aufmaß',areaCardCount('aufmass')+' Karten','Aufmaß & Abrechnung']
     ].forEach(function(x){var b=document.createElement('button');b.type='button';b.className='v17Area';var fallback=(x[0]==='aufmass'?'AM':x[1].replace(' ',''));var areaIcon=(typeof iconSvg==='function'?iconSvg(x[0]):fallback);b.innerHTML='<span class="v17AreaCode" aria-hidden="true">'+areaIcon+'</span><strong>'+x[1]+'</strong><span>'+x[2]+' · '+x[3]+'</span>';b.onclick=function(){if(typeof openArea==='function')openArea(x[0]);};areaGrid.appendChild(b);});
     areas.appendChild(areaGrid);dashboard.appendChild(areas);
 
@@ -162,7 +164,7 @@
 
     var wa=document.createElement('section');wa.className='v17Group';wa.innerHTML='<div class="v17GroupHead"><div class="v17GroupTitle">Wissen & Auswertung</div><div class="v17GroupHint">Nachschlagen & analysieren</div></div>';
     var wg=document.createElement('div');wg.className='v17ActionGrid two';
-    wg.appendChild(makeButton('v17Action','🔎','Wissensdatenbank','Alle 520 Karten nach Begriffen und Themen durchsuchen.',function(){showSetup('knowledge');}));
+    wg.appendChild(makeButton('v17Action','🔎','Wissensdatenbank','Alle '+totalCards()+' Karten nach Begriffen und Themen durchsuchen.',function(){showSetup('knowledge');}));
     wg.appendChild(makeButton('v17Action','📊','Statistik','Lernstand, Prüfungsreife und Prüfungsanalyse ansehen.',function(){if(typeof openStats==='function')openStats();}));
     wa.appendChild(wg);dashboard.appendChild(wa);
 
@@ -175,7 +177,7 @@
   function syncProgress(){
     if(!dashboard)return;
     var learned=parseInt((byId('statsLearned')&&byId('statsLearned').textContent)||'0',10)||0;
-    var total=parseInt((byId('statsTotal')&&byId('statsTotal').textContent)||'520',10)||520;
+    var total=totalCards();
     var errors=parseInt((byId('statsErrors')&&byId('statsErrors').textContent)||'0',10)||0;
     var last=(byId('statsLastQuiz')&&byId('statsLastQuiz').textContent)||'–';
     if(byId('v17ProgressTitle'))byId('v17ProgressTitle').textContent=learned+' von '+total+' Karten bearbeitet';
