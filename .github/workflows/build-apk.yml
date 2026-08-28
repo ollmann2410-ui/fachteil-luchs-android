@@ -27,6 +27,24 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: V2.0.1 Bindemittel-Patch aktivieren
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/assets/index.html')
+          s = p.read_text(encoding='utf-8')
+          tag = '<script src="bindemittel-trainer-v201-patch.js"></script>'
+          if tag not in s:
+              low = s.lower()
+              pos = low.rfind('</body>')
+              if pos < 0:
+                  raise SystemExit('Kein </body> in index.html gefunden')
+              s = s[:pos] + tag + '\n' + s[pos:]
+              p.write_text(s, encoding='utf-8')
+          print('Bindemittel V2.0.1 Patch aktiv:', tag in p.read_text(encoding='utf-8'))
+          PY
+
       - name: Signatur-Secrets prüfen
         shell: bash
         env:
@@ -57,18 +75,18 @@ jobs:
         run: gradle :app:assembleRelease --stacktrace
 
       - name: APK sinnvoll benennen
-        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.0.0-SIGNED.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.0.1-SIGNED.apk
 
       - name: APK-Signatur prüfen
         shell: bash
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           test -n "$APKSIGNER" || { echo "apksigner nicht gefunden"; exit 1; }
-          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.0.0-SIGNED.apk
+          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.0.1-SIGNED.apk
 
       - name: APK als Download bereitstellen
         uses: actions/upload-artifact@v4
         with:
-          name: Fachteil-Luchs-V2.0.0-SIGNED-APK
-          path: Fachteil-Luchs-V2.0.0-SIGNED.apk
+          name: Fachteil-Luchs-V2.0.1-SIGNED-APK
+          path: Fachteil-Luchs-V2.0.1-SIGNED.apk
           if-no-files-found: error
