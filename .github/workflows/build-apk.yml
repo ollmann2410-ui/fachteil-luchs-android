@@ -27,6 +27,50 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: V2.2-Kartensatz technisch pruefen
+        shell: bash
+        run: |
+          node --check app/src/main/assets/cards-v22.js
+          node <<'NODE'
+          const fs=require('fs');
+          global.window=global;
+          const base={hf1:364,hf2:96,hf3:64,aufmass:96};
+          const AREAS={};
+          for(const [area,count] of Object.entries(base)){
+            AREAS[area]={cards:Array.from({length:count},(_,i)=>({n:i+1,id:`${area}:${i+1}`,q:`BASE-${area}-${i+1}`}))};
+          }
+          const ALL_CARDS=Object.entries(AREAS).flatMap(([area,data])=>data.cards.map(card=>(card._area=area,card)));
+          const CARD_BY_KEY=new Map(ALL_CARDS.map(card=>[card.id,card]));
+          eval(fs.readFileSync('app/src/main/assets/cards-v22.js','utf8'));
+          const expected={hf1:472,hf2:99,hf3:68,aufmass:98};
+          for(const [area,count] of Object.entries(expected)){
+            if(AREAS[area].cards.length!==count) throw new Error(`${area}: ${AREAS[area].cards.length} statt ${count}`);
+          }
+          if(ALL_CARDS.length!==737) throw new Error(`Gesamtbestand ${ALL_CARDS.length} statt 737`);
+          if(CARD_BY_KEY.size!==737) throw new Error(`ID-Map ${CARD_BY_KEY.size} statt 737`);
+          console.log('Kartensatz OK:', window.__FachteilCardsV22Meta);
+          NODE
+
+      - name: V2.2-Kartensatz vor Analysemodulen einbinden
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/src/main/assets/index.html')
+          s=p.read_text(encoding='utf-8')
+          needle='<script src="analysis-v12.js"></script>'
+          tag='<script src="cards-v22.js"></script>'
+          if tag in s:
+              raise SystemExit('cards-v22.js ist bereits in index.html eingebunden; Build abgebrochen, um Doppelimport zu verhindern.')
+          if needle not in s:
+              raise SystemExit('Einbindepunkt analysis-v12.js nicht gefunden.')
+          s=s.replace(needle, tag+'\n'+needle, 1)
+          p.write_text(s, encoding='utf-8')
+          if s.index(tag) > s.index(needle):
+              raise SystemExit('Falsche Script-Reihenfolge.')
+          print('cards-v22.js wird vor analysis-v12.js geladen.')
+          PY
+
       - name: Signatur-Secrets prüfen
         shell: bash
         env:
@@ -57,18 +101,18 @@ jobs:
         run: gradle :app:assembleRelease --stacktrace
 
       - name: APK sinnvoll benennen
-        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.1.0-SIGNED.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.2.0-SIGNED.apk
 
       - name: APK-Signatur prüfen
         shell: bash
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           test -n "$APKSIGNER" || { echo "apksigner nicht gefunden"; exit 1; }
-          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.1.0-SIGNED.apk
+          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.2.0-SIGNED.apk
 
       - name: APK als Download bereitstellen
         uses: actions/upload-artifact@v4
         with:
-          name: Fachteil-Luchs-V2.1.0-SIGNED-APK
-          path: Fachteil-Luchs-V2.1.0-SIGNED.apk
+          name: Fachteil-Luchs-V2.2.0-SIGNED-APK
+          path: Fachteil-Luchs-V2.2.0-SIGNED.apk
           if-no-files-found: error
