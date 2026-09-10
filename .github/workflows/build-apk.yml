@@ -27,12 +27,13 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: V2.3.1-Kartensatz technisch pruefen
+      - name: V2.4.0 App und Kartensatz technisch pruefen
         shell: bash
         run: |
           node --check app/src/main/assets/cards-v22.js
           node --check app/src/main/assets/cards-v23.js
           node --check app/src/main/assets/exam-v13.js
+          node --check app/src/main/assets/farbenlehre-trainer-v24.js
 
           node <<'NODE'
           const fs=require('fs');
@@ -99,6 +100,30 @@ jobs:
           console.log('Kartensatz V2.3 OK:', window.__FachteilCardsV23Meta);
           NODE
 
+          node <<'NODE'
+          const fs=require('fs');
+          global.window=global;
+          eval(fs.readFileSync('app/src/main/assets/farbenlehre-trainer-v24.js','utf8'));
+          const t=window.FachteilColorTrainerV24;
+          if(!t || !t.validation || !t.validation.ok) throw new Error('Farbenlehre-Trainer konnte nicht validiert werden.');
+          if(t.exercises.length!==58) throw new Error(`Farbenlehre-Aufgaben: ${t.exercises.length} statt 58`);
+          if(t.lessons.length!==11) throw new Error(`Farbenlehre-Lektionen: ${t.lessons.length} statt 11`);
+          if(t.blocks.length!==8) throw new Error(`Farbenlehre-Blöcke: ${t.blocks.length} statt 8`);
+          if(t.blocks.filter(b=>b.ready).length!==2) throw new Error('Es müssen genau 2 Farbenlehre-Blöcke aktiv sein.');
+          const ids=t.exercises.map(x=>x.id);
+          if(new Set(ids).size!==ids.length) throw new Error('Doppelte Farbenlehre-Aufgaben-ID.');
+          for(const x of t.exercises){
+            if(!Array.isArray(x.options)||x.options.length!==4||new Set(x.options).size!==4) throw new Error(`Ungültige Antwortoptionen: ${x.id}`);
+            if(x.correct<0||x.correct>3) throw new Error(`Ungültiger Lösungsindex: ${x.id}`);
+            if(!x.src) throw new Error(`Interne Quelle fehlt: ${x.id}`);
+          }
+          const html=fs.readFileSync('app/src/main/assets/index.html','utf8');
+          if((html.match(/farbenlehre-trainer-v24\.js/g)||[]).length!==1) throw new Error('Farbenlehre-Trainer muss genau einmal in index.html eingebunden sein.');
+          if(!html.includes('const BACKUP_VERSION=4;')) throw new Error('Backup-Version 4 fehlt.');
+          if(!html.includes('colorTrainerState')||!html.includes('substrateTrainerState')) throw new Error('Trainer-Backup-Integration unvollständig.');
+          console.log('Farbenlehre-Trainer V2.4 OK:',t.validation);
+          NODE
+
       - name: V2.2 und V2.3 vor Analysemodulen einbinden
         shell: bash
         run: |
@@ -157,18 +182,18 @@ jobs:
         run: gradle :app:assembleRelease --stacktrace
 
       - name: APK sinnvoll benennen
-        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.3.1-SIGNED.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.4.0-SIGNED.apk
 
       - name: APK-Signatur prüfen
         shell: bash
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           test -n "$APKSIGNER" || { echo "apksigner nicht gefunden"; exit 1; }
-          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.3.1-SIGNED.apk
+          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.4.0-SIGNED.apk
 
       - name: APK als Download bereitstellen
         uses: actions/upload-artifact@v4
         with:
-          name: Fachteil-Luchs-V2.3.1-SIGNED-APK
-          path: Fachteil-Luchs-V2.3.1-SIGNED.apk
+          name: Fachteil-Luchs-V2.4.0-SIGNED-APK
+          path: Fachteil-Luchs-V2.4.0-SIGNED.apk
           if-no-files-found: error
