@@ -27,7 +27,7 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: V2.4.0 App und Kartensatz technisch pruefen
+      - name: V2.4.1 App und Kartensatz technisch pruefen
         shell: bash
         run: |
           node --check app/src/main/assets/cards-v22.js
@@ -106,10 +106,12 @@ jobs:
           eval(fs.readFileSync('app/src/main/assets/farbenlehre-trainer-v24.js','utf8'));
           const t=window.FachteilColorTrainerV24;
           if(!t || !t.validation || !t.validation.ok) throw new Error('Farbenlehre-Trainer konnte nicht validiert werden.');
-          if(t.exercises.length!==58) throw new Error(`Farbenlehre-Aufgaben: ${t.exercises.length} statt 58`);
-          if(t.lessons.length!==11) throw new Error(`Farbenlehre-Lektionen: ${t.lessons.length} statt 11`);
+          if(t.exercises.length!==106) throw new Error(`Farbenlehre-Aufgaben: ${t.exercises.length} statt 106`);
+          if(t.lessons.length!==19) throw new Error(`Farbenlehre-Lektionen: ${t.lessons.length} statt 19`);
           if(t.blocks.length!==8) throw new Error(`Farbenlehre-Blöcke: ${t.blocks.length} statt 8`);
-          if(t.blocks.filter(b=>b.ready).length!==2) throw new Error('Es müssen genau 2 Farbenlehre-Blöcke aktiv sein.');
+          if(t.blocks.filter(b=>b.ready).length!==3) throw new Error('Es müssen genau 3 Farbenlehre-Blöcke aktiv sein.');
+          if(t.exercises.filter(x=>String(x.lesson||'').startsWith('b3')).length!==48) throw new Error('Block 3 muss genau 48 Aufgaben enthalten.');
+          if(t.lessons.filter(x=>x.block===3).length!==8) throw new Error('Block 3 muss genau 8 Lektionen enthalten.');
           const ids=t.exercises.map(x=>x.id);
           if(new Set(ids).size!==ids.length) throw new Error('Doppelte Farbenlehre-Aufgaben-ID.');
           for(const x of t.exercises){
@@ -182,18 +184,18 @@ jobs:
         run: gradle :app:assembleRelease --stacktrace
 
       - name: APK sinnvoll benennen
-        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.4.0-SIGNED.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.4.1-SIGNED.apk
 
       - name: APK-Signatur prüfen
         shell: bash
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           test -n "$APKSIGNER" || { echo "apksigner nicht gefunden"; exit 1; }
-          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.4.0-SIGNED.apk
+          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.4.1-SIGNED.apk
 
       - name: APK als Download bereitstellen
         uses: actions/upload-artifact@v4
         with:
-          name: Fachteil-Luchs-V2.4.0-SIGNED-APK
-          path: Fachteil-Luchs-V2.4.0-SIGNED.apk
+          name: Fachteil-Luchs-V2.4.1-SIGNED-APK
+          path: Fachteil-Luchs-V2.4.1-SIGNED.apk
           if-no-files-found: error
