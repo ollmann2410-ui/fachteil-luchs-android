@@ -14,3 +14,31 @@ if(ALL_CARDS.length!==T.total||AREAS.hf1.cards.length!==T.hf1||AREAS.hf2.cards.l
 window.__FachteilCardsV23=true;window.__FachteilCardsV23Meta={added:162,total:899,hf1:634,hf2:99,hf3:68,aufmass:98,range:'hf1:473-hf1:634'};
 if(typeof updateHomeStats==='function')try{updateHomeStats();}catch(e){console.warn(e);}
 })();
+
+// V2.3.1 Kompatibilitaetsfix: Die Basis-App initialisiert die Lernanalyse,
+// bevor die additiven V2.2/V2.3-Karten geladen werden. Nach dem vollstaendigen
+// Kartenaufbau wird der Analysezustand deshalb noch einmal gegen die komplette
+// CARD_BY_KEY-Map geladen und fehlende Legacy-Eintraege werden ergaenzt.
+(function(){
+  'use strict';
+  try{
+    if(typeof ANALYSIS_STATE_KEY==='undefined'||typeof sanitizeAnalysisState!=='function'||typeof validateAnalysisState!=='function'||typeof buildAnalysisFromLegacy!=='function'||typeof saveAnalysisState!=='function')return;
+    var raw=null;
+    try{
+      var txt=localStorage.getItem(ANALYSIS_STATE_KEY);
+      if(txt!==null)raw=JSON.parse(txt);
+    }catch(e){raw=null;}
+    var repaired=raw?sanitizeAnalysisState(raw):null;
+    if(!repaired||!validateAnalysisState(repaired))repaired=emptyAnalysisState();
+    var legacy=buildAnalysisFromLegacy(studyState,errorState,'v2.3.1-postpatch-repair');
+    if(legacy&&legacy.cards){
+      Object.entries(legacy.cards).forEach(function(pair){
+        var k=pair[0],entry=pair[1];
+        if(CARD_BY_KEY.has(k)&&!repaired.cards[k])repaired.cards[k]=entry;
+      });
+    }
+    analysisState=repaired;
+    saveAnalysisState();
+    window.__FachteilCardsV231AnalysisRepair=true;
+  }catch(e){console.warn('V2.3.1 Analyse-Reparatur konnte nicht ausgefuehrt werden',e);}
+})();

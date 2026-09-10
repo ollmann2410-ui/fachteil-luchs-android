@@ -335,6 +335,6 @@
     importState:importState,
     open:openExamMenu,
     resume:resumeExam,
-    getState:function(){return publicState();}
+    getState:function(){var s=publicState();s.active=examState.active?JSON.parse(JSON.stringify(examState.active)):null;return s;}
   };
 })();
