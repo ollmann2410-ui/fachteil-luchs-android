@@ -27,48 +27,103 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: V2.2-Kartensatz technisch pruefen
+      - name: V2.3-Kartensatz technisch pruefen
         shell: bash
         run: |
           node --check app/src/main/assets/cards-v22.js
+          node --check app/src/main/assets/cards-v23.js
+
           node <<'NODE'
           const fs=require('fs');
           global.window=global;
-          const base={hf1:364,hf2:96,hf3:64,aufmass:96};
-          const AREAS={};
-          for(const [area,count] of Object.entries(base)){
-            AREAS[area]={cards:Array.from({length:count},(_,i)=>({n:i+1,id:`${area}:${i+1}`,q:`BASE-${area}-${i+1}`}))};
-          }
-          const ALL_CARDS=Object.entries(AREAS).flatMap(([area,data])=>data.cards.map(card=>(card._area=area,card)));
-          const CARD_BY_KEY=new Map(ALL_CARDS.map(card=>[card.id,card]));
+
+          // Echte Basisdaten direkt aus index.html lesen.
+          const html=fs.readFileSync('app/src/main/assets/index.html','utf8');
+          const match=html.match(/const AREAS=(\{[\s\S]*?\});\s*let currentArea=/);
+          if(!match) throw new Error('AREAS-Basisdaten in index.html nicht gefunden.');
+
+          global.AREAS=JSON.parse(match[1]);
+          Object.entries(AREAS).forEach(([area,data])=>{
+            data.cards.forEach(card=>card._area=area);
+          });
+
+          global.ALL_CARDS=Object.values(AREAS).flatMap(a=>a.cards);
+          global.CARD_BY_KEY=new Map(ALL_CARDS.map(card=>[card.id,card]));
+
+          // V2.2 auf den echten Basisbestand aufsetzen.
           eval(fs.readFileSync('app/src/main/assets/cards-v22.js','utf8'));
-          const expected={hf1:472,hf2:99,hf3:68,aufmass:98};
-          for(const [area,count] of Object.entries(expected)){
-            if(AREAS[area].cards.length!==count) throw new Error(`${area}: ${AREAS[area].cards.length} statt ${count}`);
+
+          const after22={hf1:472,hf2:99,hf3:68,aufmass:98,total:737};
+          for(const [area,count] of Object.entries(after22)){
+            if(area==='total') continue;
+            if(AREAS[area].cards.length!==count){
+              throw new Error(`V2.2 ${area}: ${AREAS[area].cards.length} statt ${count}`);
+            }
           }
-          if(ALL_CARDS.length!==737) throw new Error(`Gesamtbestand ${ALL_CARDS.length} statt 737`);
-          if(CARD_BY_KEY.size!==737) throw new Error(`ID-Map ${CARD_BY_KEY.size} statt 737`);
-          console.log('Kartensatz OK:', window.__FachteilCardsV22Meta);
+          if(ALL_CARDS.length!==after22.total) throw new Error(`V2.2 Gesamtbestand ${ALL_CARDS.length} statt ${after22.total}`);
+          if(CARD_BY_KEY.size!==after22.total) throw new Error(`V2.2 ID-Map ${CARD_BY_KEY.size} statt ${after22.total}`);
+
+          // V2.3 ergänzen.
+          eval(fs.readFileSync('app/src/main/assets/cards-v23.js','utf8'));
+
+          const expected={hf1:634,hf2:99,hf3:68,aufmass:98,total:899};
+          for(const [area,count] of Object.entries(expected)){
+            if(area==='total') continue;
+            if(AREAS[area].cards.length!==count){
+              throw new Error(`V2.3 ${area}: ${AREAS[area].cards.length} statt ${count}`);
+            }
+          }
+          if(ALL_CARDS.length!==expected.total) throw new Error(`V2.3 Gesamtbestand ${ALL_CARDS.length} statt ${expected.total}`);
+          if(CARD_BY_KEY.size!==expected.total) throw new Error(`V2.3 ID-Map ${CARD_BY_KEY.size} statt ${expected.total}`);
+
+          // IDs und exakte Fragen doppelt absichern.
+          const ids=ALL_CARDS.map(c=>c.id);
+          if(new Set(ids).size!==ids.length) throw new Error('Doppelte Karten-ID im Gesamtbestand.');
+
+          const nq=s=>String(s||'').trim().toLocaleLowerCase('de-DE').replace(/\s+/g,' ');
+          const seenQ=new Map();
+          for(const c of ALL_CARDS){
+            const q=nq(c.q);
+            if(seenQ.has(q)) throw new Error(`Exakte Fragendublette: ${c.id} und ${seenQ.get(q)} – ${c.q}`);
+            seenQ.set(q,c.id);
+          }
+
+          for(let n=473;n<=634;n++){
+            if(!CARD_BY_KEY.has(`hf1:${n}`)) throw new Error(`V2.3-ID fehlt: hf1:${n}`);
+          }
+
+          if(!window.__FachteilCardsV22) throw new Error('V2.2-Patchflag fehlt.');
+          if(!window.__FachteilCardsV23) throw new Error('V2.3-Patchflag fehlt.');
+
+          console.log('Kartensatz V2.3 OK:', window.__FachteilCardsV23Meta);
           NODE
 
-      - name: V2.2-Kartensatz vor Analysemodulen einbinden
+      - name: V2.2 und V2.3 vor Analysemodulen einbinden
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
+
           p=Path('app/src/main/assets/index.html')
           s=p.read_text(encoding='utf-8')
+
           needle='<script src="analysis-v12.js"></script>'
-          tag='<script src="cards-v22.js"></script>'
-          if tag in s:
-              raise SystemExit('cards-v22.js ist bereits in index.html eingebunden; Build abgebrochen, um Doppelimport zu verhindern.')
+          tag22='<script src="cards-v22.js"></script>'
+          tag23='<script src="cards-v23.js"></script>'
+
+          if tag22 in s or tag23 in s:
+              raise SystemExit('Karten-Patch ist bereits in index.html eingebunden; Build abgebrochen, um Doppelimport zu verhindern.')
           if needle not in s:
               raise SystemExit('Einbindepunkt analysis-v12.js nicht gefunden.')
-          s=s.replace(needle, tag+'\n'+needle, 1)
+
+          block=tag22+'\n'+tag23+'\n'+needle
+          s=s.replace(needle, block, 1)
           p.write_text(s, encoding='utf-8')
-          if s.index(tag) > s.index(needle):
+
+          if not (s.index(tag22) < s.index(tag23) < s.index(needle)):
               raise SystemExit('Falsche Script-Reihenfolge.')
-          print('cards-v22.js wird vor analysis-v12.js geladen.')
+
+          print('cards-v22.js -> cards-v23.js -> analysis-v12.js wird geladen.')
           PY
 
       - name: Signatur-Secrets prüfen
@@ -101,18 +156,18 @@ jobs:
         run: gradle :app:assembleRelease --stacktrace
 
       - name: APK sinnvoll benennen
-        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.2.0-SIGNED.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.3.0-SIGNED.apk
 
       - name: APK-Signatur prüfen
         shell: bash
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           test -n "$APKSIGNER" || { echo "apksigner nicht gefunden"; exit 1; }
-          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.2.0-SIGNED.apk
+          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.3.0-SIGNED.apk
 
       - name: APK als Download bereitstellen
         uses: actions/upload-artifact@v4
         with:
-          name: Fachteil-Luchs-V2.2.0-SIGNED-APK
-          path: Fachteil-Luchs-V2.2.0-SIGNED.apk
+          name: Fachteil-Luchs-V2.3.0-SIGNED-APK
+          path: Fachteil-Luchs-V2.3.0-SIGNED.apk
           if-no-files-found: error
