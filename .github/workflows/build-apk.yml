@@ -27,11 +27,12 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: V2.3-Kartensatz technisch pruefen
+      - name: V2.3.1-Kartensatz technisch pruefen
         shell: bash
         run: |
           node --check app/src/main/assets/cards-v22.js
           node --check app/src/main/assets/cards-v23.js
+          node --check app/src/main/assets/exam-v13.js
 
           node <<'NODE'
           const fs=require('fs');
@@ -156,18 +157,18 @@ jobs:
         run: gradle :app:assembleRelease --stacktrace
 
       - name: APK sinnvoll benennen
-        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.3.0-SIGNED.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.3.1-SIGNED.apk
 
       - name: APK-Signatur prüfen
         shell: bash
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           test -n "$APKSIGNER" || { echo "apksigner nicht gefunden"; exit 1; }
-          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.3.0-SIGNED.apk
+          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.3.1-SIGNED.apk
 
       - name: APK als Download bereitstellen
         uses: actions/upload-artifact@v4
         with:
-          name: Fachteil-Luchs-V2.3.0-SIGNED-APK
-          path: Fachteil-Luchs-V2.3.0-SIGNED.apk
+          name: Fachteil-Luchs-V2.3.1-SIGNED-APK
+          path: Fachteil-Luchs-V2.3.1-SIGNED.apk
           if-no-files-found: error
