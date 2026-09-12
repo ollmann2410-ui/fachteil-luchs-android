@@ -27,7 +27,7 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: V2.4.4 App und Kartensatz technisch pruefen
+      - name: V2.4.5 App und Kartensatz technisch pruefen
         shell: bash
         run: |
           node --check app/src/main/assets/cards-v22.js
@@ -106,10 +106,10 @@ jobs:
           eval(fs.readFileSync('app/src/main/assets/farbenlehre-trainer-v24.js','utf8'));
           const t=window.FachteilColorTrainerV24;
           if(!t || !t.validation || !t.validation.ok) throw new Error('Farbenlehre-Trainer konnte nicht validiert werden.');
-          if(t.exercises.length!==250) throw new Error(`Farbenlehre-Aufgaben: ${t.exercises.length} statt 250`);
-          if(t.lessons.length!==43) throw new Error(`Farbenlehre-Lektionen: ${t.lessons.length} statt 43`);
+          if(t.exercises.length!==346) throw new Error(`Farbenlehre-Aufgaben: ${t.exercises.length} statt 346`);
+          if(t.lessons.length!==59) throw new Error(`Farbenlehre-Lektionen: ${t.lessons.length} statt 59`);
           if(t.blocks.length!==8) throw new Error(`Farbenlehre-Blöcke: ${t.blocks.length} statt 8`);
-          if(t.blocks.filter(b=>b.ready).length!==6) throw new Error('Es müssen genau 6 Farbenlehre-Blöcke aktiv sein.');
+          if(t.blocks.filter(b=>b.ready).length!==8) throw new Error('Es müssen genau 8 Farbenlehre-Blöcke aktiv sein.');
           if(t.exercises.filter(x=>String(x.lesson||'').startsWith('b3')).length!==48) throw new Error('Block 3 muss genau 48 Aufgaben enthalten.');
           if(t.lessons.filter(x=>x.block===3).length!==8) throw new Error('Block 3 muss genau 8 Lektionen enthalten.');
           if(t.exercises.filter(x=>String(x.lesson||'').startsWith('b4')).length!==48) throw new Error('Block 4 muss genau 48 Aufgaben enthalten.');
@@ -118,6 +118,11 @@ jobs:
           if(t.lessons.filter(x=>x.block===5).length!==8) throw new Error('Block 5 muss genau 8 Lektionen enthalten.');
           if(t.exercises.filter(x=>String(x.lesson||'').startsWith('b6')).length!==48) throw new Error('Block 6 muss genau 48 Aufgaben enthalten.');
           if(t.lessons.filter(x=>x.block===6).length!==8) throw new Error('Block 6 muss genau 8 Lektionen enthalten.');
+          if(t.exercises.filter(x=>String(x.lesson||'').startsWith('b7')).length!==48) throw new Error('Block 7 muss genau 48 Aufgaben enthalten.');
+          if(t.lessons.filter(x=>x.block===7).length!==8) throw new Error('Block 7 muss genau 8 Lektionen enthalten.');
+          if(t.exercises.filter(x=>String(x.lesson||'').startsWith('b8')).length!==48) throw new Error('Block 8 muss genau 48 Aufgaben enthalten.');
+          if(t.lessons.filter(x=>x.block===8).length!==8) throw new Error('Block 8 muss genau 8 Lektionen enthalten.');
+          if(t.finalTestSize!==32) throw new Error(`Farbenlehre-Gesamttest: ${t.finalTestSize} statt 32 Aufgaben`);
           const ids=t.exercises.map(x=>x.id);
           if(new Set(ids).size!==ids.length) throw new Error('Doppelte Farbenlehre-Aufgaben-ID.');
           const prompts=t.exercises.map(x=>String(x.prompt||'').trim().toLowerCase());
@@ -131,7 +136,7 @@ jobs:
           if((html.match(/farbenlehre-trainer-v24\.js/g)||[]).length!==1) throw new Error('Farbenlehre-Trainer muss genau einmal in index.html eingebunden sein.');
           if(!html.includes('const BACKUP_VERSION=4;')) throw new Error('Backup-Version 4 fehlt.');
           if(!html.includes('colorTrainerState')||!html.includes('substrateTrainerState')) throw new Error('Trainer-Backup-Integration unvollständig.');
-          console.log('Farbenlehre-Trainer V2.4.4 OK:',t.validation);
+          console.log('Farbenlehre-Trainer V2.4.5 KOMPLETT OK:',t.validation);
           NODE
 
       - name: V2.2 und V2.3 vor Analysemodulen einbinden
@@ -192,18 +197,18 @@ jobs:
         run: gradle :app:assembleRelease --stacktrace
 
       - name: APK sinnvoll benennen
-        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.4.4-SIGNED.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.4.5-SIGNED.apk
 
       - name: APK-Signatur prüfen
         shell: bash
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           test -n "$APKSIGNER" || { echo "apksigner nicht gefunden"; exit 1; }
-          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.4.4-SIGNED.apk
+          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.4.5-SIGNED.apk
 
       - name: APK als Download bereitstellen
         uses: actions/upload-artifact@v4
         with:
-          name: Fachteil-Luchs-V2.4.4-SIGNED-APK
-          path: Fachteil-Luchs-V2.4.4-SIGNED.apk
+          name: Fachteil-Luchs-V2.4.5-SIGNED-APK
+          path: Fachteil-Luchs-V2.4.5-SIGNED.apk
           if-no-files-found: error
