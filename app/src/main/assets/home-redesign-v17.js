@@ -3,11 +3,14 @@
   if(window.__FachteilLuchsHomeV17)return;
   window.__FachteilLuchsHomeV17=true;
 
-  var home=null,dashboard=null;
-  function totalCards(){return (typeof ALL_CARDS!=='undefined'&&ALL_CARDS&&ALL_CARDS.length)?ALL_CARDS.length:520;}
+  // V2.6: aufgeräumte Startseite. Die stabilen Lern-/Prüfungsfunktionen bleiben
+  // unverändert; hier wird nur ihre Navigation klarer gebündelt.
+  var home=null,dashboard=null,learningHub=null,trainerHub=null;
+  function totalCards(){return (typeof ALL_CARDS!=='undefined'&&ALL_CARDS&&ALL_CARDS.length)?ALL_CARDS.length:899;}
   function areaCardCount(key){try{return (typeof AREAS!=='undefined'&&AREAS[key]&&AREAS[key].cards)?AREAS[key].cards.length:0;}catch(e){return 0;}}
   function byId(id){return document.getElementById(id);}
   function q(sel,root){return (root||document).querySelector(sel);}
+  function qa(sel,root){return Array.prototype.slice.call((root||document).querySelectorAll(sel));}
   function safe(fn){try{return fn();}catch(e){return null;}}
 
   function injectStyle(){
@@ -15,14 +18,14 @@
     var s=document.createElement('style');
     s.id='home-v17-styles';
     s.textContent=`
-      /* --- V1.7: ruhige Startseite + separate Einstellungsansichten --- */
+      /* --- V2.6: ruhige Startseite + gebündelte Hubs --- */
       .v17Dashboard{display:grid;gap:15px}
       .v17Overview{padding:14px 15px;display:grid;gap:9px}
       .v17OverviewTop{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
       .v17Eyebrow{font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:950;color:var(--muted)}
       .v17OverviewTitle{font-size:17px;font-weight:950;letter-spacing:-.02em;margin-top:2px}
       .v17OverviewMeta{font-size:10px;line-height:1.4;color:var(--muted);margin-top:3px}
-      .v17OverviewBadges{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;max-width:190px}
+      .v17OverviewBadges{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;max-width:210px}
       .v17OverviewBadges .badge{font-size:8px;padding:5px 7px}
       .v17Progress{height:6px;border-radius:999px;overflow:hidden;border:1px solid var(--line);background:var(--soft)}
       .v17Progress>span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--primary),var(--primary2));transition:width .2s ease}
@@ -40,7 +43,7 @@
       .v17Area strong{display:block;font-size:13px;margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       .v17Area span{display:block;font-size:8px;color:var(--muted);margin-top:2px;line-height:1.3}
 
-      .v17ActionGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+      .v17ActionGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
       .v17ActionGrid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
       .v17Action{appearance:none;width:100%;color:var(--text);text-align:left;display:grid;grid-template-columns:40px 1fr auto;gap:9px;align-items:center;padding:11px 12px;border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01)),var(--card);box-shadow:0 7px 18px rgba(0,0,0,.08);cursor:pointer;min-width:0}
       .v17Action:hover{border-color:rgba(121,197,255,.52);transform:translateY(-1px)}
@@ -48,23 +51,26 @@
       .v17ActionTitle{display:block;font-size:12px;font-weight:950;line-height:1.2}
       .v17ActionText{display:block;font-size:8.5px;line-height:1.35;color:var(--muted);margin-top:3px}
       .v17ActionArrow{font-size:17px;color:var(--muted);font-weight:900}
+      .v17Action.primary{border-color:rgba(121,197,255,.30);background:linear-gradient(135deg,rgba(50,158,255,.11),rgba(121,197,255,.035)),var(--card)}
       .v17Action.exam{border-color:rgba(121,197,255,.30);background:linear-gradient(135deg,rgba(50,158,255,.11),rgba(121,197,255,.035)),var(--card)}
       .v18SmartAction{border-color:rgba(121,197,255,.34);background:linear-gradient(135deg,rgba(50,158,255,.14),rgba(121,197,255,.035)),var(--card)}
       .v18SmartAction .v17ActionIcon{box-shadow:0 0 0 1px rgba(121,197,255,.08),0 8px 20px rgba(50,158,255,.10)}
-      .v17ExamCard{padding:0;overflow:hidden}
-      .v17ExamCard .v17Action{border:0;border-radius:0;box-shadow:none}
+      .v17ExamCard{padding:0;overflow:hidden;border-radius:16px}
+      .v17ExamCard .v17Action{border:0;border-radius:0;box-shadow:none;height:100%}
       .v17ResumeRow{display:flex;padding:0 11px 10px}
-      .v17ResumeRow .btn{min-height:31px;padding:5px 8px;font-size:8.5px;box-shadow:none}
+      .v17ResumeRow .btn{min-height:31px;padding:5px 8px;font-size:8.5px;box-shadow:none;width:100%}
       .v17ResumeRow.hidden{display:none!important}
 
       .v17Utility{display:flex;justify-content:center;padding-top:0}
       .v17Utility .btn{min-height:34px;padding:6px 10px;font-size:9px;background:transparent;box-shadow:none;color:var(--muted)}
 
-      #home.v17Home>.homeSearchCard,#home.v17Home>.quizHome,#home.v17Home>.randomLearnHome,#home.v17Home>.errorPoolHome,#home.v17Home>#tiles,#home.v17Home>#openStats,#home.v17Home>#examHomeV13{display:none!important}
+      #home.v17Home>.homeSearchCard,#home.v17Home>.quizHome,#home.v17Home>.randomLearnHome,#home.v17Home>.errorPoolHome,#home.v17Home>#tiles,#home.v17Home>#openStats,#home.v17Home>#examHomeV13,#home.v17Home>.v26Hub{display:none!important}
       #home.v17Home.v17Setup>.v17Dashboard{display:none!important}
       #home.v17Home.v17Setup[data-v17-setup="knowledge"]>.homeSearchCard,
       #home.v17Home.v17Setup[data-v17-setup="quiz"]>.quizHome,
-      #home.v17Home.v17Setup[data-v17-setup="random"]>.randomLearnHome{display:block!important;margin-bottom:0;animation:fade .18s ease}
+      #home.v17Home.v17Setup[data-v17-setup="random"]>.randomLearnHome,
+      #home.v17Home.v17Setup[data-v17-setup="learning"]>#v26LearningHub,
+      #home.v17Home.v17Setup[data-v17-setup="trainer"]>#v26TrainerHub{display:block!important;margin-bottom:0;animation:fade .18s ease}
 
       #home.v17Home.v17Setup>.homeSearchCard,#home.v17Home.v17Setup>.quizHome,#home.v17Home.v17Setup>.randomLearnHome{padding:17px}
       #home.v17Home.v17Setup .homeSearchTitle,#home.v17Home.v17Setup .quizHomeTitle,#home.v17Home.v17Setup .randomLearnTitle{font-size:20px}
@@ -76,13 +82,25 @@
       .v17QuickTag{border:1px solid var(--line);background:var(--soft);color:var(--text);padding:6px 8px;border-radius:999px;cursor:pointer;font-size:8.5px;font-weight:850}
       .v17QuickTag:hover{border-color:rgba(121,197,255,.55)}
 
+      .v26Hub{padding:16px;display:grid;gap:14px}
+      .v26HubTop{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding-bottom:12px;border-bottom:1px solid var(--line)}
+      .v26HubTitle{font-size:22px;font-weight:950;letter-spacing:-.025em}
+      .v26HubText{font-size:10px;line-height:1.5;color:var(--muted);margin-top:4px;max-width:650px}
+      .v26HubTop .btn{min-height:34px;font-size:9px;white-space:nowrap}
+      .v26HubSection{display:grid;gap:8px}
+      .v26HubSectionTitle{font-size:10px;font-weight:900;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+      .v26RandomRow{margin-top:2px}
+      .v26TrainerPlaceholder{padding:18px;border:1px dashed var(--line);border-radius:16px;color:var(--muted);font-size:10px;text-align:center}
+      .v26TrainerSource{display:none!important}
+
       @media(max-width:700px){
         .v17AreaGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
         .v17ActionGrid,.v17ActionGrid.two{grid-template-columns:1fr}
         .v17OverviewBadges{max-width:120px}
+        .v26HubTop{flex-direction:column}.v26HubTop .btn{width:100%}
       }
       @media(max-width:390px){
-        .v17Overview{padding:12px}.v17Area{padding:10px}.v17Action{padding:10px 11px}.v17ActionText{font-size:8px}
+        .v17Overview{padding:12px}.v17Area{padding:10px}.v17Action{padding:10px 11px}.v17ActionText{font-size:8px}.v26Hub{padding:13px}
       }
     `;
     document.head.appendChild(s);
@@ -94,12 +112,20 @@
     b.onclick=fn;return b;
   }
 
+  function areaButton(key,short,label,sub){
+    var b=document.createElement('button');b.type='button';b.className='v17Area';
+    var fallback=(key==='aufmass'?'AM':short.replace(' ',''));var areaIcon=(typeof iconSvg==='function'?iconSvg(key):fallback);
+    b.innerHTML='<span class="v17AreaCode" aria-hidden="true">'+areaIcon+'</span><strong>'+short+'</strong><span>'+areaCardCount(key)+' Karten · '+sub+'</span>';
+    b.setAttribute('aria-label',label||short);b.onclick=function(){if(typeof openArea==='function')openArea(key);};return b;
+  }
+
   function showSetup(kind){
     if(!home)return;
     home.classList.add('v17Setup');home.setAttribute('data-v17-setup',kind);
     var hb=byId('homeBtn');if(hb)hb.classList.remove('hidden');
     if(kind==='knowledge')setTimeout(function(){var i=byId('globalSearch');if(i)i.focus();},60);
-    window.scrollTo({top:0,behavior:'smooth'});
+    if(kind==='trainer')collectTrainerLaunchers();
+    try{window.scrollTo({top:0,behavior:'smooth'});}catch(e){}
   }
 
   function showDashboard(){
@@ -107,7 +133,8 @@
     home.classList.remove('v17Setup');home.removeAttribute('data-v17-setup');
     var input=byId('globalSearch');if(input&&input.value){input.value='';if(typeof renderGlobalSearch==='function')renderGlobalSearch();}
     var hb=byId('homeBtn');if(hb&&!home.classList.contains('hidden'))hb.classList.add('hidden');
-    syncProgress();syncExam();window.scrollTo({top:0,behavior:'smooth'});
+    syncProgress();syncExam();collectTrainerLaunchers();
+    try{window.scrollTo({top:0,behavior:'smooth'});}catch(e){}
   }
 
   function addSetupLabel(panel,title,text){
@@ -134,39 +161,64 @@
     if(random)addSetupLabel(random,'Zufallslernen-Einstellungen','20 Karten');
   }
 
+  function createLearningHub(){
+    if(byId('v26LearningHub')){learningHub=byId('v26LearningHub');return;}
+    learningHub=document.createElement('div');learningHub.id='v26LearningHub';learningHub.className='card v26Hub';
+    learningHub.innerHTML='<div class="v26HubTop"><div><div class="v17Eyebrow">Lernkarten</div><div class="v26HubTitle">Was möchtest du lernen?</div><div class="v26HubText">Wähle einen Handlungsbereich oder starte eine gemischte 20-Karten-Runde.</div></div><button type="button" class="btn" id="v26LearningBack">← Startseite</button></div><div class="v26HubSection"><div class="v26HubSectionTitle">Bereich wählen</div><div class="v17AreaGrid" id="v26LearningAreas"></div></div><div class="v26HubSection v26RandomRow"><div class="v26HubSectionTitle">Gemischt lernen</div><div class="v17ActionGrid" id="v26LearningActions"></div></div>';
+    var grid=q('#v26LearningAreas',learningHub);
+    grid.appendChild(areaButton('hf1','HF 1','HF 1 – Technik & Gestaltung','Technik & Gestaltung'));
+    grid.appendChild(areaButton('hf2','HF 2','HF 2 – Auftragsabwicklung','Auftragsabwicklung'));
+    grid.appendChild(areaButton('hf3','HF 3','HF 3 – Betriebsführung','Betriebsführung'));
+    grid.appendChild(areaButton('aufmass','Aufmaß','Aufmaß & Abrechnung','Aufmaß & Abrechnung'));
+    q('#v26LearningActions',learningHub).appendChild(makeButton('v17Action','🎲','20 Karten zufällig','Bereiche auswählen und frei lernen.',function(){showSetup('random');}));
+    home.appendChild(learningHub);q('#v26LearningBack',learningHub).onclick=showDashboard;
+  }
+
+  function createTrainerHub(){
+    if(byId('v26TrainerHub')){trainerHub=byId('v26TrainerHub');return;}
+    trainerHub=document.createElement('div');trainerHub.id='v26TrainerHub';trainerHub.className='card v26Hub';
+    trainerHub.innerHTML='<div class="v26HubTop"><div><div class="v17Eyebrow">Vertiefen</div><div class="v26HubTitle">Trainer</div><div class="v26HubText">Alle Spezialtrainer an einem Ort. Fortschritt und Freischaltungen bleiben vollständig erhalten.</div></div><button type="button" class="btn" id="v26TrainerBack">← Startseite</button></div><div class="v26HubSection"><div class="v26HubSectionTitle">Fachtrainer</div><div class="v17ActionGrid two" id="v26TrainerGrid"></div><div class="v26TrainerPlaceholder" id="v26TrainerPlaceholder">Trainer werden geladen …</div></div>';
+    home.appendChild(trainerHub);q('#v26TrainerBack',trainerHub).onclick=showDashboard;
+  }
+
+  function collectTrainerLaunchers(){
+    var grid=byId('v26TrainerGrid');if(!grid)return;
+    ['btLauncher','utLauncher','ctLauncher','stLauncher'].forEach(function(id){
+      var b=byId(id);if(!b||b.parentNode===grid)return;
+      var g=b.closest?b.closest('.v17Group'):null;if(g)g.classList.add('v26TrainerSource');
+      grid.appendChild(b);
+    });
+    var count=['btLauncher','utLauncher','ctLauncher','stLauncher'].filter(function(id){var b=byId(id);return b&&b.parentNode===grid;}).length;
+    var p=byId('v26TrainerPlaceholder');if(p)p.style.display=count?'none':'block';
+    if(count===4&&dashboard)qa('.v26TrainerSource',dashboard).forEach(function(g){if(!q('.v17Action',g)&&g.parentNode)g.parentNode.removeChild(g);});
+    var start=byId('v26TrainerStart'),text=start&&q('.v17ActionText',start),msg=count===4?'4 Fachtrainer · Fortschritt und Freischaltungen auf einen Blick.':(count+' von 4 Trainern bereit.');if(text&&text.textContent!==msg)text.textContent=msg;
+  }
+
   function createDashboard(){
     if(byId('v17Dashboard')){dashboard=byId('v17Dashboard');return;}
     dashboard=document.createElement('div');dashboard.id='v17Dashboard';dashboard.className='v17Dashboard';
 
-    var overview=document.createElement('div');overview.className='card v17Overview';overview.innerHTML='<div class="v17OverviewTop"><div><div class="v17Eyebrow">Dein Lernstand</div><div class="v17OverviewTitle" id="v17ProgressTitle">0 von '+totalCards()+' Karten bearbeitet</div><div class="v17OverviewMeta">Was möchtest du jetzt machen?</div></div><div class="v17OverviewBadges"><span class="badge" id="v17ErrorBadge">Fehlerpool 0</span><span class="badge" id="v17QuizBadge">Quiz –</span></div></div><div class="v17Progress"><span id="v17ProgressBar"></span></div>';
+    var overview=document.createElement('div');overview.className='card v17Overview';overview.innerHTML='<div class="v17OverviewTop"><div><div class="v17Eyebrow">Dein Lernstand</div><div class="v17OverviewTitle" id="v17ProgressTitle">0 von '+totalCards()+' Karten bearbeitet</div><div class="v17OverviewMeta">Wähle den nächsten sinnvollen Schritt.</div></div><div class="v17OverviewBadges"><span class="badge" id="v17ErrorBadge">Fehlerpool 0</span><span class="badge" id="v17QuizBadge">Quiz –</span></div></div><div class="v17Progress"><span id="v17ProgressBar"></span></div>';
     dashboard.appendChild(overview);
 
-    var areas=document.createElement('section');areas.className='v17Group';areas.innerHTML='<div class="v17GroupHead"><div class="v17GroupTitle">Lernbereiche</div><div class="v17GroupHint">Direkt lernen</div></div>';
-    var areaGrid=document.createElement('div');areaGrid.className='v17AreaGrid';
-    [
-      ['hf1','HF 1',areaCardCount('hf1')+' Karten','Technik & Gestaltung'],['hf2','HF 2',areaCardCount('hf2')+' Karten','Auftragsabwicklung'],['hf3','HF 3',areaCardCount('hf3')+' Karten','Betriebsführung'],['aufmass','Aufmaß',areaCardCount('aufmass')+' Karten','Aufmaß & Abrechnung']
-    ].forEach(function(x){var b=document.createElement('button');b.type='button';b.className='v17Area';var fallback=(x[0]==='aufmass'?'AM':x[1].replace(' ',''));var areaIcon=(typeof iconSvg==='function'?iconSvg(x[0]):fallback);b.innerHTML='<span class="v17AreaCode" aria-hidden="true">'+areaIcon+'</span><strong>'+x[1]+'</strong><span>'+x[2]+' · '+x[3]+'</span>';b.onclick=function(){if(typeof openArea==='function')openArea(x[0]);};areaGrid.appendChild(b);});
-    areas.appendChild(areaGrid);dashboard.appendChild(areas);
-
-    var train=document.createElement('section');train.className='v17Group';train.innerHTML='<div class="v17GroupHead"><div class="v17GroupTitle">Trainieren</div><div class="v17GroupHint">Modus wählen</div></div>';
-    var tg=document.createElement('div');tg.className='v17ActionGrid two';
-    var smartBtn=makeButton('v17Action v18SmartAction','⚡','Intelligentes Lernen','20 Karten automatisch passend zu deinem Lernstand.',function(){if(window.FachteilSmartV18&&typeof window.FachteilSmartV18.start==='function')window.FachteilSmartV18.start();});smartBtn.id='v18SmartStart';tg.appendChild(smartBtn);
-    tg.appendChild(makeButton('v17Action','🎲','20 Karten zufällig','Bereiche auswählen und frei lernen.',function(){showSetup('random');}));
-    tg.appendChild(makeButton('v17Action','🧠','30-Karten-Quiz','Zeitlimit und Quiz-Art auswählen.',function(){showSetup('quiz');}));
-    tg.appendChild(makeButton('v17Action','⚠️','Fehlerpool','Unsichere und falsche Karten wiederholen.',function(){if(typeof openErrorPool==='function')openErrorPool();}));
-    train.appendChild(tg);dashboard.appendChild(train);
-
-    var exam=document.createElement('section');exam.className='v17Group';exam.innerHTML='<div class="v17GroupHead"><div class="v17GroupTitle">Prüfung</div><div class="v17GroupHint">Gesamt oder einzelnes HF</div></div>';
+    var start=document.createElement('section');start.className='v17Group';start.innerHTML='<div class="v17GroupHead"><div class="v17GroupTitle">Loslegen</div><div class="v17GroupHint">Lernen · vertiefen · prüfen</div></div>';
+    var sg=document.createElement('div');sg.className='v17ActionGrid two';
+    sg.appendChild(makeButton('v17Action primary','📚','Lernkarten',totalCards()+' Karten in HF 1, HF 2, HF 3 und Aufmaß.',function(){showSetup('learning');}));
+    var smartBtn=makeButton('v17Action v18SmartAction','⚡','Intelligentes Lernen','20 Karten automatisch passend zu deinem Lernstand.',function(){if(window.FachteilSmartV18&&typeof window.FachteilSmartV18.start==='function')window.FachteilSmartV18.start();});smartBtn.id='v18SmartStart';sg.appendChild(smartBtn);
+    var trainerBtn=makeButton('v17Action primary','🎯','Trainer','4 Fachtrainer · Fortschritt und Freischaltungen auf einen Blick.',function(){showSetup('trainer');});trainerBtn.id='v26TrainerStart';sg.appendChild(trainerBtn);
     var examCard=document.createElement('div');examCard.className='card v17ExamCard';
-    examCard.appendChild(makeButton('v17Action exam','📝','Prüfungsmodus','Prüfungsart und Zeitlimit auf der nächsten Seite festlegen.',function(){if(window.FachteilExamV13&&typeof window.FachteilExamV13.open==='function')window.FachteilExamV13.open();}));
-    var rr=document.createElement('div');rr.id='v17ResumeRow';rr.className='v17ResumeRow hidden';rr.innerHTML='<button type="button" class="btn" id="v17ExamResume">Laufende Prüfung fortsetzen</button>';examCard.appendChild(rr);exam.appendChild(examCard);dashboard.appendChild(exam);
+    examCard.appendChild(makeButton('v17Action exam','📝','Prüfungsmodus','Gesamtprüfung oder einzelnen Bereich trainieren.',function(){if(window.FachteilExamV13&&typeof window.FachteilExamV13.open==='function')window.FachteilExamV13.open();}));
+    var rr=document.createElement('div');rr.id='v17ResumeRow';rr.className='v17ResumeRow hidden';rr.innerHTML='<button type="button" class="btn" id="v17ExamResume">Laufende Prüfung fortsetzen</button>';examCard.appendChild(rr);sg.appendChild(examCard);
+    start.appendChild(sg);dashboard.appendChild(start);
     q('#v17ExamResume',examCard).onclick=function(){if(window.FachteilExamV13&&typeof window.FachteilExamV13.resume==='function')window.FachteilExamV13.resume();};
 
-    var wa=document.createElement('section');wa.className='v17Group';wa.innerHTML='<div class="v17GroupHead"><div class="v17GroupTitle">Wissen & Auswertung</div><div class="v17GroupHint">Nachschlagen & analysieren</div></div>';
-    var wg=document.createElement('div');wg.className='v17ActionGrid two';
-    wg.appendChild(makeButton('v17Action','🔎','Wissensdatenbank','Alle '+totalCards()+' Karten nach Begriffen und Themen durchsuchen.',function(){showSetup('knowledge');}));
-    wg.appendChild(makeButton('v17Action','📊','Statistik','Lernstand, Prüfungsreife und Prüfungsanalyse ansehen.',function(){if(typeof openStats==='function')openStats();}));
-    wa.appendChild(wg);dashboard.appendChild(wa);
+    var tools=document.createElement('section');tools.className='v17Group';tools.innerHTML='<div class="v17GroupHead"><div class="v17GroupTitle">Werkzeuge</div><div class="v17GroupHint">Üben · nachschlagen · auswerten</div></div>';
+    var tg=document.createElement('div');tg.className='v17ActionGrid two';
+    tg.appendChild(makeButton('v17Action','🧠','30-Karten-Quiz','Quiz-Art und Zeitlimit auswählen.',function(){showSetup('quiz');}));
+    tg.appendChild(makeButton('v17Action','⚠️','Fehlerpool','Unsichere und falsche Karten gezielt wiederholen.',function(){if(typeof openErrorPool==='function')openErrorPool();}));
+    tg.appendChild(makeButton('v17Action','🔎','Wissensdatenbank','Alle '+totalCards()+' Karten nach Begriffen durchsuchen.',function(){showSetup('knowledge');}));
+    tg.appendChild(makeButton('v17Action','📊','Statistik & Analyse','Lernstand, Prüfungsreife und Prüfungsanalyse ansehen.',function(){if(typeof openStats==='function')openStats();}));
+    tools.appendChild(tg);dashboard.appendChild(tools);
 
     var util=document.createElement('div');util.className='v17Utility';util.innerHTML='<button type="button" class="btn" id="v17DataBtn">⚙ Daten & Lernstand verwalten</button>';dashboard.appendChild(util);
     q('#v17DataBtn',util).onclick=function(){if(typeof openStats==='function')openStats();setTimeout(function(){var d=byId('analysisDetailsV122');if(d)d.open=true;var b=q('.backupPanel');if(b)b.scrollIntoView({behavior:'smooth',block:'start'});},100);};
@@ -196,6 +248,7 @@
   function observeData(){
     ['statsLearned','statsTotal','statsErrors','statsLastQuiz'].forEach(function(id){var el=byId(id);if(el)new MutationObserver(syncProgress).observe(el,{childList:true,characterData:true,subtree:true});});
     var nativeResume=byId('examResumeBtn');if(nativeResume)new MutationObserver(syncExam).observe(nativeResume,{attributes:true,childList:true,characterData:true,subtree:true});
+    if(dashboard)new MutationObserver(function(){collectTrainerLaunchers();}).observe(dashboard,{childList:true,subtree:true});
   }
 
   function patchNavigation(){
@@ -217,12 +270,13 @@
 
   function init(){
     home=byId('home');if(!home)return;
-    injectStyle();home.classList.add('v17Home');setupExistingPanels();createDashboard();observeData();patchNavigation();syncProgress();syncExam();showDashboard();
+    injectStyle();home.classList.add('v17Home');setupExistingPanels();createDashboard();createLearningHub();createTrainerHub();observeData();patchNavigation();syncProgress();syncExam();showDashboard();
+    var tries=0,t=setInterval(function(){tries++;collectTrainerLaunchers();if(['btLauncher','utLauncher','ctLauncher','stLauncher'].every(function(id){return !!byId(id);})||tries>50)clearInterval(t);},120);
   }
 
+  window.FachteilHomeV26={showDashboard:showDashboard,showSetup:showSetup,collectTrainerLaunchers:collectTrainerLaunchers};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
-
 
 /* --- V1.8: Intelligentes Lernen --- */
 (function(){
