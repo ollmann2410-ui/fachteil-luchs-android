@@ -27,13 +27,14 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: V2.4.5 App und Kartensatz technisch pruefen
+      - name: V2.5.0 App und Kartensatz technisch pruefen
         shell: bash
         run: |
           node --check app/src/main/assets/cards-v22.js
           node --check app/src/main/assets/cards-v23.js
           node --check app/src/main/assets/exam-v13.js
           node --check app/src/main/assets/farbenlehre-trainer-v24.js
+          node --check app/src/main/assets/stilkunde-trainer-v25.js
 
           node <<'NODE'
           const fs=require('fs');
@@ -134,9 +135,59 @@ jobs:
           }
           const html=fs.readFileSync('app/src/main/assets/index.html','utf8');
           if((html.match(/farbenlehre-trainer-v24\.js/g)||[]).length!==1) throw new Error('Farbenlehre-Trainer muss genau einmal in index.html eingebunden sein.');
-          if(!html.includes('const BACKUP_VERSION=4;')) throw new Error('Backup-Version 4 fehlt.');
-          if(!html.includes('colorTrainerState')||!html.includes('substrateTrainerState')) throw new Error('Trainer-Backup-Integration unvollständig.');
+          if(!html.includes('const BACKUP_VERSION=5;')) throw new Error('Backup-Version 5 fehlt.');
+          if(!html.includes('colorTrainerState')||!html.includes('substrateTrainerState')||!html.includes('styleTrainerState')) throw new Error('Trainer-Backup-Integration unvollständig.');
           console.log('Farbenlehre-Trainer V2.4.5 KOMPLETT OK:',t.validation);
+          NODE
+
+
+          node <<'NODE'
+          const fs=require('fs');
+          global.window=global;
+          eval(fs.readFileSync('app/src/main/assets/stilkunde-trainer-v25.js','utf8'));
+          const t=window.FachteilStyleTrainerV25;
+          if(!t || !t.validation || !t.validation.ok) throw new Error('Stilkunde-Trainer konnte nicht validiert werden.');
+          if(t.exercises.length!==198) throw new Error(`Stilkunde-Aufgaben: ${t.exercises.length} statt 198`);
+          if(t.lessons.length!==30) throw new Error(`Stilkunde-Lektionen: ${t.lessons.length} statt 30`);
+          if(t.blocks.length!==6) throw new Error(`Stilkunde-Blöcke: ${t.blocks.length} statt 6`);
+          if(t.finalTestSize!==24) throw new Error(`Stilkunde-Gesamttest: ${t.finalTestSize} statt 24`);
+          const expected={1:36,2:33,3:33,4:33,5:33,6:30};
+          for(const [b,n] of Object.entries(expected)){
+            const got=t.exercises.filter(x=>x.block===Number(b)).length;
+            if(got!==n) throw new Error(`Stilkunde Block ${b}: ${got} statt ${n} Aufgaben`);
+          }
+          const ids=t.exercises.map(x=>x.id);
+          if(new Set(ids).size!==ids.length) throw new Error('Doppelte Stilkunde-Aufgaben-ID.');
+          const norm=s=>String(s||'').trim().toLocaleLowerCase('de-DE').replace(/\s+/g,' ');
+          const prompts=t.exercises.map(x=>norm(x.prompt));
+          if(new Set(prompts).size!==prompts.length) throw new Error('Doppelte Stilkunde-Frage gefunden.');
+          for(const x of t.exercises){
+            if(!Array.isArray(x.options)||x.options.length!==4||new Set(x.options).size!==4) throw new Error(`Ungültige Stilkunde-Antwortoptionen: ${x.id}`);
+            if(x.correct<0||x.correct>3) throw new Error(`Ungültiger Stilkunde-Lösungsindex: ${x.id}`);
+            if(!x.src) throw new Error(`Stilkunde-Quelle fehlt: ${x.id}`);
+            if(x.image && !String(x.image).startsWith('stilkunde-img/')) throw new Error(`Ungültiger Stilkunde-Bildschlüssel: ${x.id}`);
+          }
+          if(t.validation.imageExerciseCount!==30) throw new Error(`Stilkunde-Bildaufgaben: ${t.validation.imageExerciseCount} statt 30`);
+
+          // Gegen den echten 899er-Kartenbestand auf wortgleiche Fragen prüfen.
+          const html=fs.readFileSync('app/src/main/assets/index.html','utf8');
+          const match=html.match(/const AREAS=(\{[\s\S]*?\});\s*let currentArea=/);
+          if(!match) throw new Error('AREAS-Basisdaten für Stilkunde-Dublettentest fehlen.');
+          global.AREAS=JSON.parse(match[1]);
+          Object.entries(AREAS).forEach(([area,data])=>data.cards.forEach(card=>card._area=area));
+          global.ALL_CARDS=Object.values(AREAS).flatMap(a=>a.cards);
+          global.CARD_BY_KEY=new Map(ALL_CARDS.map(card=>[card.id,card]));
+          eval(fs.readFileSync('app/src/main/assets/cards-v22.js','utf8'));
+          eval(fs.readFileSync('app/src/main/assets/cards-v23.js','utf8'));
+          if(ALL_CARDS.length!==899) throw new Error(`Stilkunde-Dublettentest: ${ALL_CARDS.length} Karten statt 899`);
+          const normalQ=new Map(ALL_CARDS.map(c=>[norm(c.q),c.id]));
+          const dup=t.exercises.filter(x=>normalQ.has(norm(x.prompt)));
+          if(dup.length) throw new Error('Wortgleiche Stilkunde-Frage zu normaler Lernkarte: '+dup.map(x=>`${x.id}/${normalQ.get(norm(x.prompt))}`).join(', '));
+
+          if((html.match(/stilkunde-trainer-v25\.js/g)||[]).length!==1) throw new Error('Stilkunde-Trainer muss genau einmal in index.html eingebunden sein.');
+          if(!html.includes('const BACKUP_VERSION=5;')) throw new Error('Backup-Version 5 fehlt.');
+          if(!html.includes('styleTrainerState')||!html.includes('fachteil_style_trainer_v25')) throw new Error('Stilkunde-Backup/Reset-Integration unvollständig.');
+          console.log('Stilkunde-Trainer V2.5.0 OK:',t.validation);
           NODE
 
       - name: V2.2 und V2.3 vor Analysemodulen einbinden
@@ -197,18 +248,18 @@ jobs:
         run: gradle :app:assembleRelease --stacktrace
 
       - name: APK sinnvoll benennen
-        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.4.5-SIGNED.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.5.0-SIGNED.apk
 
       - name: APK-Signatur prüfen
         shell: bash
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           test -n "$APKSIGNER" || { echo "apksigner nicht gefunden"; exit 1; }
-          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.4.5-SIGNED.apk
+          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.5.0-SIGNED.apk
 
       - name: APK als Download bereitstellen
         uses: actions/upload-artifact@v4
         with:
-          name: Fachteil-Luchs-V2.4.5-SIGNED-APK
-          path: Fachteil-Luchs-V2.4.5-SIGNED.apk
+          name: Fachteil-Luchs-V2.5.0-SIGNED-APK
+          path: Fachteil-Luchs-V2.5.0-SIGNED.apk
           if-no-files-found: error
