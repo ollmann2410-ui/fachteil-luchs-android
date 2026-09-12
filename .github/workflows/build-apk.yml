@@ -14,28 +14,25 @@ jobs:
 
     steps:
       - name: Repository auschecken
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Java 17 einrichten
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Gradle 8.9 einrichten
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '8.9'
 
-      - name: V2.5.1 App, Inhalte und Trainer technisch pruefen
+      - name: V2.6.0 App, Inhalte und Trainer technisch pruefen
         shell: bash
         run: |
-          node --check app/src/main/assets/cards-v22.js
-          node --check app/src/main/assets/cards-v23.js
-          node --check app/src/main/assets/exam-v13.js
-          node --check app/src/main/assets/farbenlehre-trainer-v24.js
-          node --check app/src/main/assets/untergrund-trainer-v21.js
-          node --check app/src/main/assets/stilkunde-trainer-v25.js
+          for js in app/src/main/assets/*.js; do
+            node --check "$js"
+          done
 
           node <<'NODE'
           const fs=require('fs');
@@ -138,7 +135,7 @@ jobs:
           if((html.match(/farbenlehre-trainer-v24\.js/g)||[]).length!==1) throw new Error('Farbenlehre-Trainer muss genau einmal in index.html eingebunden sein.');
           if(!html.includes('const BACKUP_VERSION=5;')) throw new Error('Backup-Version 5 fehlt.');
           if(!html.includes('colorTrainerState')||!html.includes('substrateTrainerState')||!html.includes('styleTrainerState')) throw new Error('Trainer-Backup-Integration unvollständig.');
-          console.log('Farbenlehre-Trainer V2.4.5 KOMPLETT OK:',t.validation);
+          console.log('Farbenlehre-Trainer V2.6.0 OK:',t.validation);
           NODE
 
 
@@ -188,10 +185,10 @@ jobs:
           if((html.match(/stilkunde-trainer-v25\.js/g)||[]).length!==1) throw new Error('Stilkunde-Trainer muss genau einmal in index.html eingebunden sein.');
           if(!html.includes('const BACKUP_VERSION=5;')) throw new Error('Backup-Version 5 fehlt.');
           if(!html.includes('styleTrainerState')||!html.includes('fachteil_style_trainer_v25')) throw new Error('Stilkunde-Backup/Reset-Integration unvollständig.');
-          console.log('Stilkunde-Trainer V2.5.1 OK:',t.validation);
+          console.log('Stilkunde-Trainer V2.6.0 OK:',t.validation);
           NODE
 
-      - name: V2.5.1 Reparatur-Patch pruefen
+      - name: V2.6.0 Integritaet, Startseite und Cleanup pruefen
         shell: bash
         run: |
           node <<'NODE'
@@ -226,44 +223,42 @@ jobs:
           if(/Dino|Lösungsbogen|Unterrichtsunterlag|Unterrichtsgrafik|im Arbeitsblatt|aus dem Arbeitsblatt/i.test(visColor)) throw new Error('Interne Quellenformulierung im Farbenlehre-Quiz.');
           // Stilkunde wird im normalen V2.5.0-Block bereits separat evaluiert; hier wird die Datei statisch geprüft.
           const styleJs=fs.readFileSync('app/src/main/assets/stilkunde-trainer-v25.js','utf8'); if(/im Arbeitsblatt bezeichnet|Lösungsbogen nennt|Unterrichtsgrafik bezeichnet/i.test(styleJs)) throw new Error('Interne Quellenformulierung im Stilkunde-Trainer.');
-          console.log('V2.5.1 Reparatur-Patch statisch OK.');
+          console.log('V2.6.0 Integritaet statisch OK.');
           NODE
 
-      - name: V2.2 und V2.3 vor Analysemodulen einbinden
+      - name: Script-Reihenfolge und Cleanup-Dateien pruefen
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
+          test ! -f app/src/main/build.gradle || { echo "Veraltete Datei app/src/main/build.gradle ist noch vorhanden."; exit 1; }
+          test ! -f app/src/main/assets/bindemittel-trainer-v201-patch.js || { echo "Nicht mehr geladener Bindemittel-Patch ist noch vorhanden."; exit 1; }
+          grep -q "versionCode 29" app/build.gradle || { echo "versionCode 29 fehlt"; exit 1; }
+          grep -q "versionName '2.6.0'" app/build.gradle || { echo "versionName 2.6.0 fehlt"; exit 1; }
 
-          p=Path('app/src/main/assets/index.html')
-          s=p.read_text(encoding='utf-8')
+          node <<'NODE'
+          const fs=require('fs');
+          const html=fs.readFileSync('app/src/main/assets/index.html','utf8');
+          const order=[
+            'cards-v22.js','cards-v23.js','analysis-v12.js','analysis-v121-mobile.js',
+            'exam-v13.js','exam-analysis-v14.js','readiness-v15.js','home-redesign-v17.js',
+            'bindemittel-trainer-v20.js','untergrund-trainer-v21.js','farbenlehre-trainer-v24.js','stilkunde-trainer-v25.js'
+          ];
+          let last=-1;
+          for(const name of order){
+            const tag=`<script src="${name}"></script>`;
+            const count=(html.match(new RegExp(tag.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g'))||[]).length;
+            if(count!==1) throw new Error(`${name}: Script-Tag ${count}x statt genau einmal.`);
+            const pos=html.indexOf(tag);
+            if(pos<=last) throw new Error(`Falsche Script-Reihenfolge bei ${name}.`);
+            last=pos;
+          }
+          if(/bindemittel-trainer-v201-patch\.js/.test(html)) throw new Error('Toter V2.0.1-Patch ist noch in index.html referenziert.');
 
-          needle='<script src="analysis-v12.js"></script>'
-          tag22='<script src="cards-v22.js"></script>'
-          tag23='<script src="cards-v23.js"></script>'
-
-          has22=tag22 in s
-          has23=tag23 in s
-
-          if has22 != has23:
-              raise SystemExit('Unvollständige Karten-Patch-Einbindung: cards-v22.js und cards-v23.js müssen gemeinsam vorhanden sein.')
-
-          if needle not in s:
-              raise SystemExit('Einbindepunkt analysis-v12.js nicht gefunden.')
-
-          if not has22:
-              block=tag22+'\n'+tag23+'\n'+needle
-              s=s.replace(needle, block, 1)
-              p.write_text(s, encoding='utf-8')
-
-          if s.count(tag22)!=1 or s.count(tag23)!=1 or s.count(needle)!=1:
-              raise SystemExit('Karten-/Analyse-Skripte müssen jeweils genau einmal eingebunden sein.')
-
-          if not (s.index(tag22) < s.index(tag23) < s.index(needle)):
-              raise SystemExit('Falsche Script-Reihenfolge.')
-
-          print('cards-v22.js -> cards-v23.js -> analysis-v12.js ist korrekt eingebunden.')
-          PY
+          const home=fs.readFileSync('app/src/main/assets/home-redesign-v17.js','utf8');
+          for(const marker of ['window.FachteilHomeV26','v26TrainerHub','v26LearningHub','Loslegen','Werkzeuge']){
+            if(!home.includes(marker)) throw new Error(`V2.6-Startseitenmarker fehlt: ${marker}`);
+          }
+          console.log('Script-Reihenfolge und V2.6-Cleanup OK.');
+          NODE
 
       - name: Signatur-Secrets prüfen
         shell: bash
@@ -295,18 +290,18 @@ jobs:
         run: gradle :app:assembleRelease --stacktrace
 
       - name: APK sinnvoll benennen
-        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.5.1-SIGNED.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.6.0-SIGNED.apk
 
       - name: APK-Signatur prüfen
         shell: bash
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           test -n "$APKSIGNER" || { echo "apksigner nicht gefunden"; exit 1; }
-          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.5.1-SIGNED.apk
+          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.6.0-SIGNED.apk
 
       - name: APK als Download bereitstellen
         uses: actions/upload-artifact@v4
         with:
-          name: Fachteil-Luchs-V2.5.1-SIGNED-APK
-          path: Fachteil-Luchs-V2.5.1-SIGNED.apk
+          name: Fachteil-Luchs-V2.6.0-SIGNED-APK
+          path: Fachteil-Luchs-V2.6.0-SIGNED.apk
           if-no-files-found: error
