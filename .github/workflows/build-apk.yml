@@ -27,13 +27,14 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: V2.5.0 App und Kartensatz technisch pruefen
+      - name: V2.5.1 App, Inhalte und Trainer technisch pruefen
         shell: bash
         run: |
           node --check app/src/main/assets/cards-v22.js
           node --check app/src/main/assets/cards-v23.js
           node --check app/src/main/assets/exam-v13.js
           node --check app/src/main/assets/farbenlehre-trainer-v24.js
+          node --check app/src/main/assets/untergrund-trainer-v21.js
           node --check app/src/main/assets/stilkunde-trainer-v25.js
 
           node <<'NODE'
@@ -187,7 +188,45 @@ jobs:
           if((html.match(/stilkunde-trainer-v25\.js/g)||[]).length!==1) throw new Error('Stilkunde-Trainer muss genau einmal in index.html eingebunden sein.');
           if(!html.includes('const BACKUP_VERSION=5;')) throw new Error('Backup-Version 5 fehlt.');
           if(!html.includes('styleTrainerState')||!html.includes('fachteil_style_trainer_v25')) throw new Error('Stilkunde-Backup/Reset-Integration unvollständig.');
-          console.log('Stilkunde-Trainer V2.5.0 OK:',t.validation);
+          console.log('Stilkunde-Trainer V2.5.1 OK:',t.validation);
+          NODE
+
+      - name: V2.5.1 Reparatur-Patch pruefen
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs=require('fs'),vm=require('vm');
+          const html=fs.readFileSync('app/src/main/assets/index.html','utf8');
+          if(!html.includes("'fachteil_smart_v18_session'")) throw new Error('Smart-Learning-Restschluessel fehlt im Komplettreset.');
+          if(!html.includes("else if(typeof window.FachteilStyleTrainerV25.clearState==='function')window.FachteilStyleTrainerV25.clearState()")) throw new Error('Backup-Ersetzlogik fuer fehlenden Stilkunde-Stand fehlt.');
+          if(/Unterrichtsstand 2012/i.test(html)) throw new Error('Sichtbarer Unterrichtsstand 2012 ist noch enthalten.');
+
+          const m=html.match(/const AREAS=(\{[\s\S]*?\});\s*let currentArea=/); if(!m) throw new Error('AREAS fehlt');
+          global.window=global; global.AREAS=JSON.parse(m[1]); Object.entries(AREAS).forEach(([k,a])=>a.cards.forEach(c=>c._area=k)); global.ALL_CARDS=Object.values(AREAS).flatMap(a=>a.cards); global.CARD_BY_KEY=new Map(ALL_CARDS.map(c=>[c.id,c]));
+          eval(fs.readFileSync('app/src/main/assets/cards-v22.js','utf8')); eval(fs.readFileSync('app/src/main/assets/cards-v23.js','utf8'));
+          if(ALL_CARDS.length!==899) throw new Error('899 Karten nicht erhalten.');
+          const c523=CARD_BY_KEY.get('hf1:523'); if(!/obersten zwei Stufen/i.test(c523.a)) throw new Error('Stehleiter-Karte nicht aktualisiert.');
+          const c593=CARD_BY_KEY.get('hf1:593'),c603=CARD_BY_KEY.get('hf1:603'); if(!/Gruppe 4/i.test(c593.a)||!/1 zu 4/i.test(c603.a)) throw new Error('BFS 26 Vier-Gruppen-System fehlt in Karten.');
+
+          const visibleCardText=ALL_CARDS.map(c=>[c.q,c.a,...(c.distractors||[])].join(' ')).join('\n');
+          const bad=/(?:Dino|Lösungsbogen|Unterrichtsunterlag|Unterrichtsstand|Physik-Arbeitsblatt|im Arbeitsblatt|laut BFS-\d+-Unterlagen|der Unterlagen)/i;
+          if(bad.test(visibleCardText)) throw new Error('Interne Quellenformulierung ist noch in sichtbaren Lernkarten enthalten.');
+
+          global.document={getElementById(){return null},querySelector(){return null},createElement(){return {style:{},classList:{add(){},remove(){},contains(){return false}},appendChild(){},setAttribute(){}}},head:{appendChild(){}},body:{appendChild(){}},readyState:'loading',addEventListener(){}};
+          global.localStorage={getItem(){return null},setItem(){},removeItem(){}}; global.setInterval=()=>0; global.clearInterval=()=>{};
+          eval(fs.readFileSync('app/src/main/assets/untergrund-trainer-v21.js','utf8'));
+          const u=window.FachteilSubstrateTrainerV21; if(!u||u.stages.length!==7||u.stages.filter(s=>s.ready).length!==7) throw new Error('Untergrundtrainer nicht 7/7 aktiv.');
+          const pools=u.stages.reduce((n,s)=>n+(Array.isArray(s.pool)?s.pool.length:0),0); if(pools!==150) throw new Error(`Untergrundtrainer ${pools} statt 150 Poolfragen.`);
+          for(const s of u.stages){if(!Array.isArray(s.pool)||s.pool.length<20) throw new Error(`Untergrund Stufe ${s.id}: zu kleiner Pool`);for(const x of s.pool){if(!Array.isArray(x.options)||x.options.length!==4||new Set(x.options).size!==4) throw new Error(`Untergrund Optionen ${x.id}`);}}
+
+          eval(fs.readFileSync('app/src/main/assets/farbenlehre-trainer-v24.js','utf8'));
+          const col=window.FachteilColorTrainerV24; const b8=col.exercises.filter(x=>x.lesson==='b8l8'); if(b8.length!==6||!b8.some(x=>/1 bis 4/.test(x.prompt))) throw new Error('BFS 26 Update im Farbenlehre-Trainer fehlt.');
+          const visColor=col.exercises.map(x=>[x.prompt,...x.options,x.why].join(' ')).join('\n');
+          const visStyle=(window.FachteilStyleTrainerV25?window.FachteilStyleTrainerV25.exercises:[]).map(x=>[x.prompt,...x.options,x.why].join(' ')).join('\n');
+          if(/Dino|Lösungsbogen|Unterrichtsunterlag|Unterrichtsgrafik|im Arbeitsblatt|aus dem Arbeitsblatt/i.test(visColor)) throw new Error('Interne Quellenformulierung im Farbenlehre-Quiz.');
+          // Stilkunde wird im normalen V2.5.0-Block bereits separat evaluiert; hier wird die Datei statisch geprüft.
+          const styleJs=fs.readFileSync('app/src/main/assets/stilkunde-trainer-v25.js','utf8'); if(/im Arbeitsblatt bezeichnet|Lösungsbogen nennt|Unterrichtsgrafik bezeichnet/i.test(styleJs)) throw new Error('Interne Quellenformulierung im Stilkunde-Trainer.');
+          console.log('V2.5.1 Reparatur-Patch statisch OK.');
           NODE
 
       - name: V2.2 und V2.3 vor Analysemodulen einbinden
@@ -248,18 +287,18 @@ jobs:
         run: gradle :app:assembleRelease --stacktrace
 
       - name: APK sinnvoll benennen
-        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.5.0-SIGNED.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.5.1-SIGNED.apk
 
       - name: APK-Signatur prüfen
         shell: bash
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           test -n "$APKSIGNER" || { echo "apksigner nicht gefunden"; exit 1; }
-          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.5.0-SIGNED.apk
+          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.5.1-SIGNED.apk
 
       - name: APK als Download bereitstellen
         uses: actions/upload-artifact@v4
         with:
-          name: Fachteil-Luchs-V2.5.0-SIGNED-APK
-          path: Fachteil-Luchs-V2.5.0-SIGNED.apk
+          name: Fachteil-Luchs-V2.5.1-SIGNED-APK
+          path: Fachteil-Luchs-V2.5.1-SIGNED.apk
           if-no-files-found: error
