@@ -242,19 +242,27 @@ jobs:
           tag22='<script src="cards-v22.js"></script>'
           tag23='<script src="cards-v23.js"></script>'
 
-          if tag22 in s or tag23 in s:
-              raise SystemExit('Karten-Patch ist bereits in index.html eingebunden; Build abgebrochen, um Doppelimport zu verhindern.')
+          has22=tag22 in s
+          has23=tag23 in s
+
+          if has22 != has23:
+              raise SystemExit('Unvollständige Karten-Patch-Einbindung: cards-v22.js und cards-v23.js müssen gemeinsam vorhanden sein.')
+
           if needle not in s:
               raise SystemExit('Einbindepunkt analysis-v12.js nicht gefunden.')
 
-          block=tag22+'\n'+tag23+'\n'+needle
-          s=s.replace(needle, block, 1)
-          p.write_text(s, encoding='utf-8')
+          if not has22:
+              block=tag22+'\n'+tag23+'\n'+needle
+              s=s.replace(needle, block, 1)
+              p.write_text(s, encoding='utf-8')
+
+          if s.count(tag22)!=1 or s.count(tag23)!=1 or s.count(needle)!=1:
+              raise SystemExit('Karten-/Analyse-Skripte müssen jeweils genau einmal eingebunden sein.')
 
           if not (s.index(tag22) < s.index(tag23) < s.index(needle)):
               raise SystemExit('Falsche Script-Reihenfolge.')
 
-          print('cards-v22.js -> cards-v23.js -> analysis-v12.js wird geladen.')
+          print('cards-v22.js -> cards-v23.js -> analysis-v12.js ist korrekt eingebunden.')
           PY
 
       - name: Signatur-Secrets prüfen
