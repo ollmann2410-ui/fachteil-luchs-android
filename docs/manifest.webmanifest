@@ -1,0 +1,25 @@
+﻿{
+  "name": "Fachteil-Luchs V2.6.0",
+  "short_name": "Fachteil-Luchs",
+  "description": "Lern- und PrÃ¼fungstrainer fÃ¼r den Fachteil.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#020817",
+  "theme_color": "#4F7CFF",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
