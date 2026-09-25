@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'fachteil-luchs-v2.6.0-ios-1';
+const CACHE_NAME = 'fachteil-luchs-v2.6.0-ios-2';
 const APP_FILES = ["./.nojekyll","./analysis-v12.js","./analysis-v121-mobile.js","./bindemittel-trainer-v20.js","./cards-v22.js","./cards-v23.js","./exam-analysis-v14.js","./exam-v13.js","./farbenlehre-trainer-v24.js","./home-redesign-v17.js","./icons/apple-touch-icon-180.png","./icons/icon-192.png","./icons/icon-512.png","./index.html","./manifest.webmanifest","./readiness-v15.js","./stilkunde-trainer-v25.js","./untergrund-trainer-v21.js"];
 
 self.addEventListener('install', function(event) {
