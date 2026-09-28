@@ -2,7 +2,7 @@ name: Build Fachteil-Luchs APK
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "hotfix-bindemittel-v2.6.0.1" ]
   workflow_dispatch:
 
 permissions:
@@ -231,8 +231,8 @@ jobs:
         run: |
           test ! -f app/src/main/build.gradle || { echo "Veraltete Datei app/src/main/build.gradle ist noch vorhanden."; exit 1; }
           test ! -f app/src/main/assets/bindemittel-trainer-v201-patch.js || { echo "Nicht mehr geladener Bindemittel-Patch ist noch vorhanden."; exit 1; }
-          grep -q "versionCode 29" app/build.gradle || { echo "versionCode 29 fehlt"; exit 1; }
-          grep -q "versionName '2.6.0'" app/build.gradle || { echo "versionName 2.6.0 fehlt"; exit 1; }
+          grep -q "versionCode 30" app/build.gradle || { echo "versionCode 30 fehlt"; exit 1; }
+          grep -q "versionName '2.6.0.1'" app/build.gradle || { echo "versionName 2.6.0.1 fehlt"; exit 1; }
 
           node <<'NODE'
           const fs=require('fs');
@@ -290,18 +290,18 @@ jobs:
         run: gradle :app:assembleRelease --stacktrace
 
       - name: APK sinnvoll benennen
-        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.6.0-SIGNED.apk
+        run: cp app/build/outputs/apk/release/app-release.apk Fachteil-Luchs-V2.6.0.1-SIGNED.apk
 
       - name: APK-Signatur prüfen
         shell: bash
         run: |
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           test -n "$APKSIGNER" || { echo "apksigner nicht gefunden"; exit 1; }
-          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.6.0-SIGNED.apk
+          "$APKSIGNER" verify --verbose --print-certs Fachteil-Luchs-V2.6.0.1-SIGNED.apk
 
       - name: APK als Download bereitstellen
         uses: actions/upload-artifact@v4
         with:
-          name: Fachteil-Luchs-V2.6.0-SIGNED-APK
-          path: Fachteil-Luchs-V2.6.0-SIGNED.apk
+          name: Fachteil-Luchs-V2.6.0.1-SIGNED-APK
+          path: Fachteil-Luchs-V2.6.0.1-SIGNED.apk
           if-no-files-found: error
